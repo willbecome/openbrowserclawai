@@ -1,160 +1,95 @@
-# OpenBrowserClaw
+# 🦀 OpenBrowserClaw (Việt hóa)
 
-> **Disclaimer:** OpenBrowserClaw is a personal, open-source project. It is **not** affiliated with any cryptocurrency, meme coin, token, or social media account. If you see coins, tokens, or social media profiles claiming association with this project, they are **not legitimate** and are not endorsed by the author(s). Stay safe and do your own research.
+**OpenBrowserClaw** là một trợ lý AI cá nhân chạy hoàn toàn trên trình duyệt của bạn. Không cần máy chủ, không cần cài đặt hạ tầng phức tạp — trình duyệt của bạn chính là máy chủ.
 
-Browser-native personal AI assistant. Zero infrastructure — the browser is the server.
+Đây là phiên bản được cải tiến mạnh mẽ với giao diện hiện đại, hỗ trợ đa mô hình AI và được tối ưu hóa riêng cho người dùng Việt Nam trên Windows 11.
 
-Built as a browser-only reimagination of NanoClaw. Same philosophy, small enough to understand, built for one user, but running entirely in a browser tab.
+---
 
-## Quick Start
+## ✨ Tính năng nổi bật
+
+- **Chạy trực tiếp trên trình duyệt (Browser-native):** Toàn bộ logic, dữ liệu và lịch sử trò chuyện được lưu trữ cục bộ trong trình duyệt của bạn (sử dụng IndexedDB và OPFS).
+- **Hỗ trợ đa mô hình AI:** Tích hợp nhiều nhà cung cấp hàng đầu:
+  - **OpenRouter (Ưu tiên):** Truy cập hàng trăm mô hình, bao gồm cả các mô hình **miễn phí**.
+  - **Anthropic:** Claude 3.7 Sonnet, Claude 3.5 Haiku, Opus.
+  - **OpenAI:** GPT-4o, o1, o3-mini.
+  - **Google Gemini:** Gemini 2.0 Flash, 1.5 Pro.
+  - **DeepSeek:** DeepSeek-V3, DeepSeek-R1.
+  - **xAI (Grok) & Perplexity.**
+- **Hỗ trợ Công cụ (Tool Use):** AI có thể thực thi lệnh shell (bash), chạy mã JavaScript, đọc/ghi tệp tin, truy cập URL và tạo nhiệm vụ định kỳ.
+- **Giao diện Tiếng Việt 100%:** Được thiết kế lại hoàn toàn thân thiện với người dùng Việt.
+- **Tối ưu Windows 11 & Chrome:** Sử dụng font chữ hệ thống mượt mà và thanh cuộn hiện đại.
+- **Bảo mật tuyệt đối:** API Key của bạn được mã hóa AES-256-GCM và lưu trữ cục bộ, không bao giờ rời khỏi trình duyệt.
+
+---
+
+## 🚀 Hướng dẫn cài đặt cho người mới (Newbie)
+
+Bạn không cần biết quá nhiều về kỹ thuật để bắt đầu. Hãy làm theo các bước sau:
+
+### 1. Chuẩn bị công cụ
+- Cài đặt **Node.js** (phiên bản 18 trở lên) từ [nodejs.org](https://nodejs.org/).
+- Một trình duyệt web hiện đại (khuyến nghị **Google Chrome** hoặc **Microsoft Edge** trên Windows 11).
+
+### 2. Tải mã nguồn và cài đặt
+Mở ứng dụng **Terminal** (hoặc PowerShell/Command Prompt) trên máy tính và chạy các lệnh sau:
 
 ```bash
+# Tải dự án về máy
+git clone https://github.com/your-repo/openbrowserclaw.git
 cd openbrowserclaw
+
+# Cài đặt các thư viện cần thiết
 npm install
+
+# Chạy ứng dụng ở chế độ phát triển
 npm run dev
 ```
 
-Open `http://localhost:5173`, paste your [Anthropic API key](https://console.anthropic.com/), and start chatting.
+### 3. Mở ứng dụng
+Sau khi chạy lệnh `npm run dev`, terminal sẽ hiển thị một địa chỉ (thường là `http://localhost:5173`). Hãy sao chép và dán địa chỉ này vào trình duyệt của bạn.
 
-## Architecture
+---
 
-```
-┌──────────────────────────────────────────────────────────┐
-│  Browser Tab (PWA)                                       │
-│                                                          │
-│  ┌──────────┐  ┌──────────┐  ┌────────────────────────┐  │
-│  │ Chat UI  │  │ Settings │  │ Task Manager           │  │
-│  └────┬─────┘  └─────┬────┘  └───────┬────────────────┘  │
-│       └──────────────┼───────────────┘                   │
-│                      ▼                                   │
-│              Orchestrator (main thread)                  │
-│              ├── Message queue & routing                 │
-│              ├── State machine (idle/thinking/responding)│
-│              └── Task scheduler (cron)                   │
-│                      │                                   │
-│          ┌───────────┼───────────┐                       │
-│          ▼           ▼           ▼                       │
-│     IndexedDB      OPFS    Agent Worker                  │
-│     (messages,   (group    (Claude API                   │
-│      tasks,       files,    tool-use loop,               │
-│      config)     memory)    WebVM sandbox)               │
-│                                                          │
-│  Channels:                                               │
-│  ├── Browser Chat (built-in)                             │
-│  └── Telegram Bot API (optional, pure HTTPS)             │
-└──────────────────────────────────────────────────────────┘
-```
+## 🛠️ Cách sử dụng
 
-## Key Files
+### Bước 1: Cấu hình AI
+1. Nhấp vào tab **"Cài đặt"** trên thanh điều hướng.
+2. Chọn **Nhà cung cấp AI** bạn muốn dùng (ví dụ: `OpenRouter`).
+3. Nhập **API Key** tương ứng.
+   - *Mẹo:* Bạn có thể lấy key OpenRouter tại [openrouter.ai](https://openrouter.ai/).
+4. Nhấn **"Lưu Key"**.
+5. Chọn **Mô hình** bạn thích từ danh sách thả xuống.
 
-| File | Purpose |
-|------|---------|
-| `src/index.ts` | Entry point, bootstraps UI |
-| `src/orchestrator.ts` | State machine, message routing, agent invocation |
-| `src/agent-worker.ts` | Web Worker: Claude API tool-use loop |
-| `src/tools.ts` | Tool definitions (bash, read/write files, fetch, etc.) |
-| `src/vm.ts` | WebVM wrapper (v86 Alpine Linux in WASM) |
-| `src/db.ts` | IndexedDB: messages, sessions, tasks, config |
-| `src/storage.ts` | OPFS: per-group file storage |
-| `src/router.ts` | Routes messages to correct channel |
-| `src/channels/browser-chat.ts` | In-browser chat channel |
-| `src/channels/telegram.ts` | Telegram Bot API channel |
-| `src/task-scheduler.ts` | Cron expression evaluation |
-| `src/crypto.ts` | AES-256-GCM encryption for stored credentials |
-| `src/ui/` | Chat, settings, and task manager components |
+### Bước 2: Bắt đầu trò chuyện
+1. Chuyển sang tab **"Trò chuyện"**.
+2. Nhập yêu cầu của bạn vào ô dưới cùng.
+3. Trợ lý (mặc định tên là **Andy**) sẽ phản hồi và thực hiện các nhiệm vụ như lập trình, tìm kiếm tin tức hoặc xử lý dữ liệu.
 
-## How It Works
+### Bước 3: Quản lý tệp tin và nhiệm vụ
+- **Tệp tin:** Xem các tệp mà AI đã tạo ra trong quá trình làm việc.
+- **Nhiệm vụ:** Lên lịch để trợ lý tự động thực hiện công việc (ví dụ: tổng hợp tin tức mỗi sáng).
 
-1. **You type a message** in the browser chat (or send one via Telegram)
-2. **The orchestrator** checks the trigger pattern, saves to IndexedDB, queues for processing
-3. **The agent worker** (a Web Worker) sends your message + conversation history to the Anthropic API
-4. **Claude responds**, possibly using tools (bash, file I/O, fetch, JavaScript)
-5. **Tool results** are fed back to Claude in a loop until it produces a final text response
-6. **The response** is routed back to the originating channel (browser chat or Telegram)
+---
 
-## Tools
+## 🔒 Bảo mật và Riêng tư
 
-| Tool | What it does |
-|------|-------------|
-| `bash` | Execute shell commands in a sandboxed Linux VM (Alpine in WASM) |
-| `javascript` | Execute JS code in an isolated scope (lighter than bash) |
-| `read_file` / `write_file` / `list_files` | Manage files in OPFS per-group workspace |
-| `fetch_url` | HTTP requests via browser `fetch()` (subject to CORS) |
-| `update_memory` | Persist context to CLAUDE.md (loaded on every conversation) |
-| `create_task` | Schedule recurring tasks with cron expressions |
+OpenBrowserClaw là một dự án mã nguồn mở ưu tiên quyền riêng tư:
+- **Dữ liệu của bạn:** Nằm trong trình duyệt của bạn.
+- **API Keys:** Được mã hóa bằng một khóa không thể xuất (non-extractable key) của trình duyệt.
+- **Kết nối:** Trình duyệt kết nối trực tiếp đến API của nhà cung cấp AI (Anthropic, OpenRouter...), không qua bất kỳ máy chủ trung gian nào.
 
-## Telegram
+---
 
-Optional. Works entirely via HTTPS — no WebSockets or special protocols.
+## ⚙️ Phát triển nâng cao
 
-1. Create a bot with `@BotFather` on Telegram
-2. Open Settings in OpenBrowserClaw, paste the bot token
-3. Send `/chatid` to your bot to get the chat ID
-4. Add the chat ID in Settings
-5. Messages from Telegram are processed the same as browser chat
-
-**Caveat**: The browser tab must be open for the bot to respond. Messages queue on Telegram's side and are processed when you reopen the tab.
-
-## WebVM (Optional)
-
-The `bash` tool runs commands in a v86-emulated Alpine Linux. To enable:
-
-1. Download the v86 WASM binary and Alpine rootfs image
-2. Place them in `public/assets/`:
-   - `public/assets/v86.wasm`
-   - `public/assets/v86/libv86.js`
-   - `public/assets/alpine-rootfs.ext2`
-3. The VM boots automatically on first use (~5-15 seconds)
-
-Without these assets, the `bash` tool returns a helpful error. All other tools work without the VM.
-
-## Comparison with NanoClaw
-
-| | NanoClaw | OpenBrowserClaw |
-|---|---|---|
-| Runtime | Node.js process | Browser tab |
-| Agent sandbox | Docker/Apple Container | Web Worker + WebVM |
-| Database | SQLite (better-sqlite3) | IndexedDB |
-| Files | Filesystem | OPFS |
-| Primary channel | WhatsApp | In-browser chat |
-| Other channels | Telegram, Discord | Telegram |
-| Agent SDK | Claude Agent SDK | Raw Anthropic API |
-| Background tasks | launchd service | setInterval (tab must be open) |
-| Deployment | Self-hosted server | Static files (any CDN) |
-| Dependencies | ~50 npm packages | 0 runtime deps |
-
-## Development
+Nếu bạn là nhà phát triển và muốn đóng góp:
 
 ```bash
-npm run dev        # Vite dev server with HMR
-npm run build      # Production build → dist/
-npm run preview    # Preview production build
-npm run typecheck  # TypeScript type checking
+npm run typecheck  # Kiểm tra lỗi kiểu TypeScript
+npm run build      # Biên dịch dự án để triển khai (sản phẩm nằm trong thư mục dist/)
+npm run preview    # Xem trước bản biên dịch
 ```
 
-## Deploy
-
-```bash
-npm run build
-# Upload dist/ to any static host:
-# GitHub Pages, Cloudflare Pages, Netlify, Vercel, S3, etc.
-```
-
-No server needed. It's just HTML, CSS, and JS.
-
-## Security
-
-OpenBrowserClaw is a proof of concept. All data stays in your browser, nothing is sent to any server except the Anthropic API. Here's an honest look at the current security posture:
-
-**What it does:**
-- API keys are encrypted at rest with AES-256-GCM using a non-extractable `CryptoKey` stored in IndexedDB. JavaScript cannot export the raw key material.
-- All storage (IndexedDB, OPFS) is same-origin scoped by the browser.
-- The agent runs in a Web Worker, separate from the UI thread.
-
-**What it doesn't do (yet):**
-- The encryption protects against casual inspection (DevTools, disk forensics) but not a full XSS attack on the same origin, an attacker with script execution could call the encrypt/decrypt API.
-- The `javascript` tool runs `eval()` in the Worker, which has access to `fetch()`. This means Claude can make arbitrary HTTP requests through the JS tool regardless of any `fetch_url` restrictions.
-- Outgoing HTTP requests (via `fetch_url` or the JS tool) have no user confirmation step.
-- The Telegram bot token is currently stored in plaintext.
-
-This is a single-user local tool, not a multi-tenant platform. Contributions to improve the security model are welcome.
+---
+*Chúc bạn có những trải nghiệm tuyệt vời với trợ lý AI cá nhân của riêng mình!* 🦀
