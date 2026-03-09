@@ -9,9 +9,9 @@
 // Instead of Claude Agent SDK in a Linux container, we use raw Anthropic
 // API calls with a tool-use loop.
 
-import type { WorkerInbound, WorkerOutbound, InvokePayload, CompactPayload, ConversationMessage, ThinkingLogEntry, TokenUsage } from './types.js';
+import type { WorkerInbound, WorkerOutbound, InvokePayload, CompactPayload, ConversationMessage, ThinkingLogEntry, TokenUsage, AIProvider, ContentBlock } from './types.js';
 import { TOOL_DEFINITIONS } from './tools.js';
-import { ANTHROPIC_API_URL, ANTHROPIC_API_VERSION, FETCH_MAX_RESPONSE } from './config.js';
+import { API_ENDPOINTS, ANTHROPIC_API_VERSION, FETCH_MAX_RESPONSE } from './config.js';
 import { readGroupFile, writeGroupFile, listGroupFiles } from './storage.js';
 import { executeShell } from './shell.js';
 import { ulid } from './ulid.js';
@@ -43,180 +43,45 @@ self.onmessage = async (event: MessageEvent<WorkerInbound>) => {
 // ---------------------------------------------------------------------------
 
 async function handleInvoke(payload: InvokePayload): Promise<void> {
-  const { groupId, messages, systemPrompt, apiKey, model, maxTokens } = payload;
+  const { groupId, messages, systemPrompt, apiKey, provider, model, maxTokens } = payload;
 
   post({ type: 'typing', payload: { groupId } });
-  log(groupId, 'info', 'Starting', `Model: ${model} · Max tokens: ${maxTokens}`);
+  log(groupId, 'info', 'Starting', `Provider: ${provider} · Model: ${model}`);
 
   try {
-    let currentMessages: ConversationMessage[] = [...messages];
-    let iterations = 0;
-    const maxIterations = 25; // Safety limit to prevent infinite loops
-
-    while (iterations < maxIterations) {
-      iterations++;
-
-      const body = {
-        model,
-        max_tokens: maxTokens,
-        cache_control: { type: 'ephemeral' },
-        system: systemPrompt,
-        messages: currentMessages,
-        tools: TOOL_DEFINITIONS,
-      };
-
-      log(groupId, 'api-call', `API call #${iterations}`, `${currentMessages.length} messages in context`);
-
-      const res = await fetch(ANTHROPIC_API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': ANTHROPIC_API_VERSION,
-          'anthropic-dangerous-direct-browser-access': 'true',
-        },
-        body: JSON.stringify(body),
-      });
-
-      if (!res.ok) {
-        const errBody = await res.text();
-        throw new Error(`Anthropic API error ${res.status}: ${errBody}`);
-      }
-
-      const result = await res.json();
-
-      // Emit token usage
-      if (result.usage) {
-        post({
-          type: 'token-usage',
-          payload: {
-            groupId,
-            inputTokens: result.usage.input_tokens || 0,
-            outputTokens: result.usage.output_tokens || 0,
-            cacheReadTokens: result.usage.cache_read_input_tokens || 0,
-            cacheCreationTokens: result.usage.cache_creation_input_tokens || 0,
-            contextLimit: getContextLimit(model),
-          },
-        });
-      }
-
-      // Log any text blocks in the response (intermediate reasoning)
-      for (const block of result.content) {
-        if (block.type === 'text' && block.text) {
-          const preview = block.text.length > 200 ? block.text.slice(0, 200) + '…' : block.text;
-          log(groupId, 'text', 'Response text', preview);
-        }
-      }
-
-      if (result.stop_reason === 'tool_use') {
-        // Execute all tool calls
-        const toolResults = [];
-        for (const block of result.content) {
-          if (block.type === 'tool_use') {
-            const inputPreview = JSON.stringify(block.input);
-            const inputShort = inputPreview.length > 300 ? inputPreview.slice(0, 300) + '…' : inputPreview;
-            log(groupId, 'tool-call', `Tool: ${block.name}`, inputShort);
-
-            post({
-              type: 'tool-activity',
-              payload: { groupId, tool: block.name, status: 'running' },
-            });
-
-            const output = await executeTool(block.name, block.input, groupId);
-
-            const outputStr = typeof output === 'string' ? output : JSON.stringify(output);
-            const outputShort = outputStr.length > 500 ? outputStr.slice(0, 500) + '…' : outputStr;
-            log(groupId, 'tool-result', `Result: ${block.name}`, outputShort);
-
-            post({
-              type: 'tool-activity',
-              payload: { groupId, tool: block.name, status: 'done' },
-            });
-
-            toolResults.push({
-              type: 'tool_result' as const,
-              tool_use_id: block.id,
-              content: typeof output === 'string'
-                ? output.slice(0, 100_000)
-                : JSON.stringify(output).slice(0, 100_000),
-            });
-          }
-        }
-
-        // Continue the conversation with tool results
-        currentMessages.push({ role: 'assistant', content: result.content });
-        currentMessages.push({ role: 'user', content: toolResults as any });
-
-        // Re-signal typing between tool iterations
-        post({ type: 'typing', payload: { groupId } });
-      } else {
-        // Final response — extract text
-        const text = result.content
-          .filter((b: { type: string }) => b.type === 'text')
-          .map((b: { text: string }) => b.text)
-          .join('');
-
-        // Strip internal tags (matching NanoClaw pattern)
-        const cleaned = text.replace(/<internal>[\s\S]*?<\/internal>/g, '').trim();
-
-        post({ type: 'response', payload: { groupId, text: cleaned || '(no response)' } });
-        return;
-      }
+    if (provider === 'anthropic') {
+      await handleAnthropicInvoke(payload);
+    } else if (provider === 'gemini') {
+      await handleGeminiInvoke(payload);
+    } else {
+      await handleOpenAICompatibleInvoke(payload);
     }
-
-    // If we hit max iterations
-    post({
-      type: 'response',
-      payload: {
-        groupId,
-        text: '⚠️ Reached maximum tool-use iterations (25). Stopping to avoid excessive API usage.',
-      },
-    });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     post({ type: 'error', payload: { groupId, error: message } });
   }
 }
 
-// ---------------------------------------------------------------------------
-// Context compaction — ask Claude to summarize the conversation
-// ---------------------------------------------------------------------------
-
-async function handleCompact(payload: CompactPayload): Promise<void> {
+async function handleAnthropicInvoke(payload: InvokePayload): Promise<void> {
   const { groupId, messages, systemPrompt, apiKey, model, maxTokens } = payload;
+  let currentMessages: ConversationMessage[] = [...messages];
+  let iterations = 0;
+  const maxIterations = 25;
 
-  post({ type: 'typing', payload: { groupId } });
-  log(groupId, 'info', 'Compacting context', `Summarizing ${messages.length} messages`);
-
-  try {
-    const compactSystemPrompt = [
-      systemPrompt,
-      '',
-      '## COMPACTION TASK',
-      '',
-      'The conversation context is getting large. Produce a concise summary of the conversation so far.',
-      'Include key facts, decisions, user preferences, and any important context.',
-      'The summary will replace the full conversation history to stay within token limits.',
-      'Be thorough but concise — aim for the essential information only.',
-    ].join('\n');
-
-    const compactMessages: ConversationMessage[] = [
-      ...messages,
-      {
-        role: 'user' as const,
-        content: 'Please provide a concise summary of our entire conversation so far. Include all key facts, decisions, code discussed, and important context. This summary will replace the full history.',
-      },
-    ];
+  while (iterations < maxIterations) {
+    iterations++;
 
     const body = {
       model,
-      max_tokens: Math.min(maxTokens, 4096),
-      cache_control: { type: 'ephemeral' },
-      system: compactSystemPrompt,
-      messages: compactMessages,
+      max_tokens: maxTokens,
+      system: systemPrompt,
+      messages: currentMessages,
+      tools: TOOL_DEFINITIONS,
     };
 
-    const res = await fetch(ANTHROPIC_API_URL, {
+    log(groupId, 'api-call', `Anthropic API #${iterations}`, `${currentMessages.length} messages`);
+
+    const res = await fetch(API_ENDPOINTS.anthropic, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -227,16 +92,309 @@ async function handleCompact(payload: CompactPayload): Promise<void> {
       body: JSON.stringify(body),
     });
 
-    if (!res.ok) {
-      const errBody = await res.text();
-      throw new Error(`Anthropic API error ${res.status}: ${errBody}`);
+    if (!res.ok) throw new Error(`Anthropic error ${res.status}: ${await res.text()}`);
+    const result = await res.json();
+
+    if (result.usage) {
+      post({
+        type: 'token-usage',
+        payload: {
+          groupId,
+          inputTokens: result.usage.input_tokens || 0,
+          outputTokens: result.usage.output_tokens || 0,
+          cacheReadTokens: result.usage.cache_read_input_tokens || 0,
+          cacheCreationTokens: result.usage.cache_creation_input_tokens || 0,
+          contextLimit: 200_000,
+        },
+      });
     }
 
+    if (result.stop_reason === 'tool_use') {
+      const toolResults = [];
+      for (const block of result.content) {
+        if (block.type === 'tool_use') {
+          log(groupId, 'tool-call', `Tool: ${block.name}`, JSON.stringify(block.input));
+          post({ type: 'tool-activity', payload: { groupId, tool: block.name, status: 'running' } });
+          const output = await executeTool(block.name, block.input, groupId);
+          post({ type: 'tool-activity', payload: { groupId, tool: block.name, status: 'done' } });
+
+          toolResults.push({
+            type: 'tool_result' as const,
+            tool_use_id: block.id,
+            name: block.name,
+            content: typeof output === 'string' ? output : JSON.stringify(output),
+          });
+        }
+      }
+      currentMessages.push({ role: 'assistant', content: result.content });
+      currentMessages.push({ role: 'user', content: toolResults as any });
+      post({ type: 'typing', payload: { groupId } });
+    } else {
+      const text = result.content.filter((b: any) => b.type === 'text').map((b: any) => b.text).join('');
+      post({ type: 'response', payload: { groupId, text: text.trim() || '(no response)' } });
+      return;
+    }
+  }
+}
+
+async function handleOpenAICompatibleInvoke(payload: InvokePayload): Promise<void> {
+  const { groupId, messages, systemPrompt, apiKey, provider, model, maxTokens } = payload;
+  const endpoint = API_ENDPOINTS[provider as keyof typeof API_ENDPOINTS] as string;
+
+  // Convert Anthropic-style messages to OpenAI-style
+  let openAIMessages: any[] = [{ role: 'system', content: systemPrompt }];
+  for (const msg of messages) {
+    if (typeof msg.content === 'string') {
+      openAIMessages.push({ role: msg.role, content: msg.content });
+    } else {
+      // Handle tool results and assistant content blocks
+      for (const block of msg.content) {
+        if (block.type === 'text') {
+          openAIMessages.push({ role: msg.role, content: block.text });
+        } else if (block.type === 'tool_use') {
+          openAIMessages.push({
+            role: 'assistant',
+            tool_calls: [{
+              id: block.id,
+              type: 'function',
+              function: { name: block.name, arguments: JSON.stringify(block.input) }
+            }]
+          });
+        } else if (block.type === 'tool_result') {
+          openAIMessages.push({
+            role: 'tool',
+            tool_call_id: block.tool_use_id,
+            content: block.content
+          });
+        }
+      }
+    }
+  }
+
+  // OpenAI-style tools
+  const tools = TOOL_DEFINITIONS.map(t => ({
+    type: 'function',
+    function: {
+      name: t.name,
+      description: t.description,
+      parameters: t.input_schema
+    }
+  }));
+
+  let iterations = 0;
+  while (iterations < 25) {
+    iterations++;
+    log(groupId, 'api-call', `${provider} API #${iterations}`, `${openAIMessages.length} messages`);
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+    };
+
+    if (provider === 'openrouter') {
+      headers['HTTP-Referer'] = 'https://openbrowserclaw.local';
+      headers['X-Title'] = 'OpenBrowserClaw';
+    }
+
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        model,
+        messages: openAIMessages,
+        tools: tools,
+        max_tokens: maxTokens,
+      }),
+    });
+
+    if (!res.ok) throw new Error(`${provider} error ${res.status}: ${await res.text()}`);
     const result = await res.json();
-    const summary = result.content
-      .filter((b: { type: string }) => b.type === 'text')
-      .map((b: { text: string }) => b.text)
-      .join('');
+    const choice = result.choices[0];
+    const message = choice.message;
+
+    if (result.usage) {
+      post({
+        type: 'token-usage',
+        payload: {
+          groupId,
+          inputTokens: result.usage.prompt_tokens || 0,
+          outputTokens: result.usage.completion_tokens || 0,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+          contextLimit: 128_000,
+        }
+      });
+    }
+
+    if (message.tool_calls) {
+      openAIMessages.push(message);
+      for (const toolCall of message.tool_calls) {
+        const name = toolCall.function.name;
+        const input = JSON.parse(toolCall.function.arguments);
+        log(groupId, 'tool-call', `Tool: ${name}`, JSON.stringify(input));
+        post({ type: 'tool-activity', payload: { groupId, tool: name, status: 'running' } });
+        const output = await executeTool(name, input, groupId);
+        post({ type: 'tool-activity', payload: { groupId, tool: name, status: 'done' } });
+
+        openAIMessages.push({
+          role: 'tool',
+          tool_call_id: toolCall.id,
+          content: typeof output === 'string' ? output : JSON.stringify(output)
+        });
+      }
+      post({ type: 'typing', payload: { groupId } });
+    } else {
+      post({ type: 'response', payload: { groupId, text: message.content.trim() || '(no response)' } });
+      return;
+    }
+  }
+}
+
+async function handleGeminiInvoke(payload: InvokePayload): Promise<void> {
+  const { groupId, messages, systemPrompt, apiKey, model, maxTokens } = payload;
+  const endpoint = `${API_ENDPOINTS.gemini}/models/${model}:generateContent?key=${apiKey}`;
+
+  // Convert messages to Gemini format
+  const contents = messages.map(msg => ({
+    role: msg.role === 'user' ? 'user' : 'model',
+    parts: typeof msg.content === 'string'
+      ? [{ text: msg.content }]
+      : msg.content.map(block => {
+          if (block.type === 'text') return { text: block.text };
+          if (block.type === 'tool_use') return { functionCall: { name: block.name, args: block.input } };
+          if (block.type === 'tool_result') return { functionResponse: { name: block.name, response: { content: block.content } } };
+          return { text: '' };
+      })
+  }));
+
+  // Gemini specific tool definition
+  const tools = [{
+    functionDeclarations: TOOL_DEFINITIONS.map(t => ({
+      name: t.name,
+      description: t.description,
+      parameters: t.input_schema
+    }))
+  }];
+
+  let currentContents = [...contents];
+  let iterations = 0;
+  while (iterations < 25) {
+    iterations++;
+    log(groupId, 'api-call', `Gemini API #${iterations}`, `${currentContents.length} messages`);
+
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: currentContents,
+        systemInstruction: { parts: [{ text: systemPrompt }] },
+        tools: tools,
+        generationConfig: { maxOutputTokens: maxTokens }
+      }),
+    });
+
+    if (!res.ok) throw new Error(`Gemini error ${res.status}: ${await res.text()}`);
+    const result = await res.json();
+    const candidate = result.candidates[0];
+    const message = candidate.content;
+
+    currentContents.push(message);
+
+    const callParts = message.parts.filter((p: any) => p.functionCall);
+    if (callParts.length > 0) {
+      const responseParts = [];
+      for (const part of callParts) {
+        const { name, args } = part.functionCall;
+        log(groupId, 'tool-call', `Tool: ${name}`, JSON.stringify(args));
+        post({ type: 'tool-activity', payload: { groupId, tool: name, status: 'running' } });
+        const output = await executeTool(name, args, groupId);
+        post({ type: 'tool-activity', payload: { groupId, tool: name, status: 'done' } });
+
+        responseParts.push({
+          functionResponse: {
+            name: name,
+            response: { content: typeof output === 'string' ? output : JSON.stringify(output) }
+          }
+        });
+      }
+      currentContents.push({ role: 'user', parts: responseParts });
+      post({ type: 'typing', payload: { groupId } });
+    } else {
+      const text = message.parts.map((p: any) => p.text || '').join('');
+      post({ type: 'response', payload: { groupId, text: text.trim() || '(no response)' } });
+      return;
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Context compaction — ask Claude to summarize the conversation
+// ---------------------------------------------------------------------------
+
+async function handleCompact(payload: CompactPayload): Promise<void> {
+  const { groupId, messages, systemPrompt, apiKey, provider, model, maxTokens } = payload;
+
+  post({ type: 'typing', payload: { groupId } });
+  log(groupId, 'info', 'Compacting context', `Summarizing ${messages.length} messages`);
+
+  try {
+    const compactSystemPrompt = [
+      systemPrompt,
+      '',
+      '## COMPACTION TASK',
+      '',
+      'Produce a concise summary of the conversation so far. This will replace history.',
+    ].join('\n');
+
+    const compactMessages: ConversationMessage[] = [
+      ...messages,
+      {
+        role: 'user' as const,
+        content: 'Please provide a concise summary of our entire conversation so far.',
+      },
+    ];
+
+    let summary = '';
+    if (provider === 'anthropic') {
+      const res = await fetch(API_ENDPOINTS.anthropic, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': ANTHROPIC_API_VERSION,
+          'anthropic-dangerous-direct-browser-access': 'true',
+        },
+        body: JSON.stringify({
+          model,
+          max_tokens: 1024,
+          system: compactSystemPrompt,
+          messages: compactMessages,
+        }),
+      });
+      if (!res.ok) throw new Error(`Anthropic error: ${await res.text()}`);
+      const result = await res.json();
+      summary = result.content.filter((b: any) => b.type === 'text').map((b: any) => b.text).join('');
+    } else {
+      const endpoint = API_ENDPOINTS[provider as keyof typeof API_ENDPOINTS] as string;
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: 'system', content: compactSystemPrompt },
+            ...compactMessages.map(m => ({ role: m.role, content: m.content as string }))
+          ],
+          max_tokens: 1024,
+        }),
+      });
+      if (!res.ok) throw new Error(`${provider} error: ${await res.text()}`);
+      const result = await res.json();
+      summary = result.choices[0].message.content;
+    }
 
     log(groupId, 'info', 'Compaction complete', `Summary: ${summary.length} chars`);
     post({ type: 'compact-done', payload: { groupId, summary } });

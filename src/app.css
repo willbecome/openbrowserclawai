@@ -1,6 +1,6 @@
 @import "tailwindcss";
 @plugin "daisyui" {
-  themes: light --default, dark --prefersdark;
+  themes: winter --default, night --prefersdark;
 }
 @plugin "@tailwindcss/typography";
 
@@ -11,6 +11,23 @@
     height: 100dvh;
     width: 100%;
     background-color: var(--color-base-100);
+    font-family: "Segoe UI Variable Display", "Segoe UI", system-ui, -apple-system, sans-serif;
+  }
+
+  /* Optimize scrollbars for Windows 11 / Chrome */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, var(--color-base-content) 20%, transparent);
+    border-radius: 10px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in srgb, var(--color-base-content) 30%, transparent);
   }
 }
 
