@@ -25,6 +25,9 @@ export const DEFAULT_MODEL = 'claude-sonnet-4-6';
 /** Anthropic API endpoint */
 export const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 
+/** OpenRouter API endpoint */
+export const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
+
 /** Anthropic API version header */
 export const ANTHROPIC_API_VERSION = '2023-06-01';
 
@@ -61,6 +64,7 @@ export const DEFAULT_GROUP_ID = 'br:main';
 /** Config keys */
 export const CONFIG_KEYS = {
   ANTHROPIC_API_KEY: 'anthropic_api_key',
+  OPENROUTER_API_KEY: 'openrouter_api_key',
   TELEGRAM_BOT_TOKEN: 'telegram_bot_token',
   TELEGRAM_CHAT_IDS: 'telegram_chat_ids',
   TRIGGER_PATTERN: 'trigger_pattern',

@@ -101,6 +101,7 @@ export class Orchestrator {
   private triggerPattern!: RegExp;
   private assistantName: string = ASSISTANT_NAME;
   private apiKey: string = '';
+  private openRouterApiKey: string = '';
   private model: string = DEFAULT_MODEL;
   private maxTokens: number = DEFAULT_MAX_TOKENS;
   private messageQueue: InboundMessage[] = [];
@@ -125,6 +126,15 @@ export class Orchestrator {
         // Stored as plaintext from before encryption — clear it
         this.apiKey = '';
         await setConfig(CONFIG_KEYS.ANTHROPIC_API_KEY, '');
+      }
+    }
+    const storedORKey = await getConfig(CONFIG_KEYS.OPENROUTER_API_KEY);
+    if (storedORKey) {
+      try {
+        this.openRouterApiKey = await decryptValue(storedORKey);
+      } catch {
+        this.openRouterApiKey = '';
+        await setConfig(CONFIG_KEYS.OPENROUTER_API_KEY, '');
       }
     }
     this.model = (await getConfig(CONFIG_KEYS.MODEL)) || DEFAULT_MODEL;
@@ -186,6 +196,9 @@ export class Orchestrator {
    * Check if the API key is configured.
    */
   isConfigured(): boolean {
+    if (this.model.includes('/') || this.model.startsWith('openrouter/')) {
+      return this.openRouterApiKey.length > 0;
+    }
     return this.apiKey.length > 0;
   }
 
@@ -196,6 +209,15 @@ export class Orchestrator {
     this.apiKey = key;
     const encrypted = await encryptValue(key);
     await setConfig(CONFIG_KEYS.ANTHROPIC_API_KEY, encrypted);
+  }
+
+  /**
+   * Update the OpenRouter API key.
+   */
+  async setOpenRouterApiKey(key: string): Promise<void> {
+    this.openRouterApiKey = key;
+    const encrypted = await encryptValue(key);
+    await setConfig(CONFIG_KEYS.OPENROUTER_API_KEY, encrypted);
   }
 
   /**
@@ -298,6 +320,7 @@ export class Orchestrator {
         messages,
         systemPrompt,
         apiKey: this.apiKey,
+        openRouterApiKey: this.openRouterApiKey,
         model: this.model,
         maxTokens: this.maxTokens,
       },
@@ -420,6 +443,7 @@ export class Orchestrator {
         messages,
         systemPrompt,
         apiKey: this.apiKey,
+        openRouterApiKey: this.openRouterApiKey,
         model: this.model,
         maxTokens: this.maxTokens,
       },
