@@ -9,9 +9,9 @@
 // Instead of Claude Agent SDK in a Linux container, we use raw Anthropic
 // API calls with a tool-use loop.
 
-import type { WorkerInbound, WorkerOutbound, InvokePayload, CompactPayload, ConversationMessage, ThinkingLogEntry, TokenUsage } from './types.js';
+import type { WorkerInbound, WorkerOutbound, InvokePayload, CompactPayload, ConversationMessage, ThinkingLogEntry, TokenUsage, ContentBlock } from './types.js';
 import { TOOL_DEFINITIONS } from './tools.js';
-import { ANTHROPIC_API_URL, ANTHROPIC_API_VERSION, FETCH_MAX_RESPONSE } from './config.js';
+import { ANTHROPIC_API_URL, ANTHROPIC_API_VERSION, FETCH_MAX_RESPONSE, OPENROUTER_API_URL } from './config.js';
 import { readGroupFile, writeGroupFile, listGroupFiles } from './storage.js';
 import { executeShell } from './shell.js';
 import { ulid } from './ulid.js';
@@ -43,7 +43,8 @@ self.onmessage = async (event: MessageEvent<WorkerInbound>) => {
 // ---------------------------------------------------------------------------
 
 async function handleInvoke(payload: InvokePayload): Promise<void> {
-  const { groupId, messages, systemPrompt, apiKey, model, maxTokens } = payload;
+  const { groupId, messages, systemPrompt, apiKey, openRouterApiKey, model, maxTokens } = payload;
+  const isOpenRouter = model.includes('/') || model.startsWith('openrouter/');
 
   post({ type: 'typing', payload: { groupId } });
   log(groupId, 'info', 'Starting', `Model: ${model} · Max tokens: ${maxTokens}`);
@@ -56,34 +57,14 @@ async function handleInvoke(payload: InvokePayload): Promise<void> {
     while (iterations < maxIterations) {
       iterations++;
 
-      const body = {
-        model,
-        max_tokens: maxTokens,
-        cache_control: { type: 'ephemeral' },
-        system: systemPrompt,
-        messages: currentMessages,
-        tools: TOOL_DEFINITIONS,
-      };
-
-      log(groupId, 'api-call', `API call #${iterations}`, `${currentMessages.length} messages in context`);
-
-      const res = await fetch(ANTHROPIC_API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': ANTHROPIC_API_VERSION,
-          'anthropic-dangerous-direct-browser-access': 'true',
-        },
-        body: JSON.stringify(body),
-      });
-
-      if (!res.ok) {
-        const errBody = await res.text();
-        throw new Error(`Anthropic API error ${res.status}: ${errBody}`);
+      let result;
+      if (isOpenRouter) {
+        log(groupId, 'api-call', `OpenRouter call #${iterations}`, `${currentMessages.length} messages in context`);
+        result = await callOpenRouter(groupId, model, systemPrompt, currentMessages, openRouterApiKey || '', maxTokens);
+      } else {
+        log(groupId, 'api-call', `Anthropic call #${iterations}`, `${currentMessages.length} messages in context`);
+        result = await callAnthropic(groupId, model, systemPrompt, currentMessages, apiKey, maxTokens);
       }
-
-      const result = await res.json();
 
       // Emit token usage
       if (result.usage) {
@@ -183,7 +164,8 @@ async function handleInvoke(payload: InvokePayload): Promise<void> {
 // ---------------------------------------------------------------------------
 
 async function handleCompact(payload: CompactPayload): Promise<void> {
-  const { groupId, messages, systemPrompt, apiKey, model, maxTokens } = payload;
+  const { groupId, messages, systemPrompt, apiKey, openRouterApiKey, model, maxTokens } = payload;
+  const isOpenRouter = model.includes('/') || model.startsWith('openrouter/');
 
   post({ type: 'typing', payload: { groupId } });
   log(groupId, 'info', 'Compacting context', `Summarizing ${messages.length} messages`);
@@ -208,31 +190,13 @@ async function handleCompact(payload: CompactPayload): Promise<void> {
       },
     ];
 
-    const body = {
-      model,
-      max_tokens: Math.min(maxTokens, 4096),
-      cache_control: { type: 'ephemeral' },
-      system: compactSystemPrompt,
-      messages: compactMessages,
-    };
-
-    const res = await fetch(ANTHROPIC_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': ANTHROPIC_API_VERSION,
-        'anthropic-dangerous-direct-browser-access': 'true',
-      },
-      body: JSON.stringify(body),
-    });
-
-    if (!res.ok) {
-      const errBody = await res.text();
-      throw new Error(`Anthropic API error ${res.status}: ${errBody}`);
+    let result;
+    if (isOpenRouter) {
+      result = await callOpenRouter(groupId, model, compactSystemPrompt, compactMessages, openRouterApiKey || '', Math.min(maxTokens, 4096));
+    } else {
+      result = await callAnthropic(groupId, model, compactSystemPrompt, compactMessages, apiKey, Math.min(maxTokens, 4096));
     }
 
-    const result = await res.json();
     const summary = result.content
       .filter((b: { type: string }) => b.type === 'text')
       .map((b: { text: string }) => b.text)
@@ -244,6 +208,165 @@ async function handleCompact(payload: CompactPayload): Promise<void> {
     const message = err instanceof Error ? err.message : String(err);
     post({ type: 'error', payload: { groupId, error: `Compaction failed: ${message}` } });
   }
+}
+
+// ---------------------------------------------------------------------------
+// API call adapters
+// ---------------------------------------------------------------------------
+
+async function callAnthropic(
+  groupId: string,
+  model: string,
+  system: string,
+  messages: ConversationMessage[],
+  apiKey: string,
+  maxTokens: number,
+) {
+  const body = {
+    model,
+    max_tokens: maxTokens,
+    cache_control: { type: 'ephemeral' },
+    system,
+    messages,
+    tools: TOOL_DEFINITIONS,
+  };
+
+  const res = await fetch(ANTHROPIC_API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': ANTHROPIC_API_VERSION,
+      'anthropic-dangerous-direct-browser-access': 'true',
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const errBody = await res.text();
+    throw new Error(`Anthropic API error ${res.status}: ${errBody}`);
+  }
+
+  return res.json();
+}
+
+async function callOpenRouter(
+  groupId: string,
+  model: string,
+  system: string,
+  messages: ConversationMessage[],
+  apiKey: string,
+  maxTokens: number,
+) {
+  // Convert Anthropic-style messages to OpenAI-style
+  const translatedMessages = [];
+  translatedMessages.push({ role: 'system', content: system });
+
+  for (const m of messages) {
+    if (typeof m.content === 'string') {
+      translatedMessages.push({ role: m.role, content: m.content });
+    } else {
+      // Content is ContentBlock[]
+      const toolCalls = [];
+      let text = '';
+      const toolResults = [];
+
+      for (const block of m.content) {
+        if (block.type === 'text') text += block.text;
+        if (block.type === 'tool_use') {
+          toolCalls.push({
+            id: block.id,
+            type: 'function',
+            function: {
+              name: block.name,
+              arguments: JSON.stringify(block.input),
+            },
+          });
+        }
+        if (block.type === 'tool_result') {
+          toolResults.push({
+            role: 'tool',
+            tool_call_id: block.tool_use_id,
+            content: block.content,
+          });
+        }
+      }
+
+      if (text || toolCalls.length > 0) {
+        translatedMessages.push({
+          role: m.role,
+          content: text || null,
+          tool_calls: toolCalls.length > 0 ? toolCalls : undefined,
+        });
+      }
+
+      if (toolResults.length > 0) {
+        translatedMessages.push(...toolResults);
+      }
+    }
+  }
+
+  // Convert Anthropic-style tools to OpenAI-style
+  const translatedTools = TOOL_DEFINITIONS.map(t => ({
+    type: 'function',
+    function: {
+      name: t.name,
+      description: t.description,
+      parameters: t.input_schema,
+    },
+  }));
+
+  const body = {
+    model,
+    messages: translatedMessages,
+    tools: translatedTools,
+    max_tokens: maxTokens,
+  };
+
+  const res = await fetch(OPENROUTER_API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+      'HTTP-Referer': 'https://openbrowserclaw.local',
+      'X-Title': 'OpenBrowserClaw',
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const errBody = await res.text();
+    throw new Error(`OpenRouter API error ${res.status}: ${errBody}`);
+  }
+
+  const result = await res.json();
+  const choice = result.choices[0];
+
+  // Convert OpenAI-style response back to Anthropic-style
+  const content: ContentBlock[] = [];
+  if (choice.message.content) {
+    content.push({ type: 'text', text: choice.message.content });
+  }
+
+  if (choice.message.tool_calls) {
+    for (const tc of choice.message.tool_calls) {
+      content.push({
+        type: 'tool_use',
+        id: tc.id,
+        name: tc.function.name,
+        input: JSON.parse(tc.function.arguments),
+      });
+    }
+  }
+
+  return {
+    content,
+    stop_reason: choice.finish_reason === 'tool_calls' ? 'tool_use' : 'end_turn',
+    usage: {
+      input_tokens: result.usage?.prompt_tokens || 0,
+      output_tokens: result.usage?.completion_tokens || 0,
+    },
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -382,8 +505,20 @@ function stripHtml(html: string): string {
 }
 
 /** Map model names to their context window limits (tokens). */
-function getContextLimit(_model: string): number {
-  // The actual session context window — 200k tokens for Claude Sonnet/Opus.
+function getContextLimit(model: string): number {
+  if (model.includes('3.5-flash')) return 256_000;
+  if (model.includes('trinity-large')) return 512_000;
+  if (model.includes('glm-4.5-air')) return 131_072;
+  if (model.includes('nemotron-3-nano-30b')) return 256_000;
+  if (model.includes('qwen3-vl-235b')) return 131_072;
+  if (model.includes('qwen3-vl-30b')) return 131_072;
+  if (model.includes('gpt-oss')) return 131_072;
+  if (model.includes('llama-3.3')) return 128_000;
+  if (model.includes('qwen3-coder')) return 262_144;
+  if (model.includes('qwen3-next')) return 262_144;
+  if (model.includes('gemma-3')) return 131_072;
+
+  // Default context window — 200k tokens for Claude Sonnet/Opus.
   return 200_000;
 }
 

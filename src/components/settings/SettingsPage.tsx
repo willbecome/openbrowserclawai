@@ -18,6 +18,18 @@ const MODELS = [
   { value: 'claude-opus-4-6', label: 'Claude Opus 4.6' },
   { value: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6' },
   { value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5' },
+  { value: 'stepfun/step-3.5-flash:free', label: 'Step 3.5 Flash (Free)' },
+  { value: 'arcee-ai/trinity-large-preview:free', label: 'Arcee Trinity Large (Free)' },
+  { value: 'z-ai/glm-4.5-air:free', label: 'GLM 4.5 Air (Free)' },
+  { value: 'nvidia/nemotron-3-nano-30b-a3b:free', label: 'Nemotron 3 Nano 30B (Free)' },
+  { value: 'qwen/qwen3-vl-235b-a22b-thinking:free', label: 'Qwen 3 VL 235B (Free)' },
+  { value: 'google/gemma-3-27b-it:free', label: 'Gemma 3 27B (Free)' },
+  { value: 'openai/gpt-oss-120b:free', label: 'GPT-OSS 120B (Free)' },
+  { value: 'meta-llama/llama-3.3-70b-instruct:free', label: 'Llama 3.3 70B (Free)' },
+  { value: 'qwen/qwen3-coder:free', label: 'Qwen 3 Coder (Free)' },
+  { value: 'qwen/qwen3-next-80b-a3b-instruct:free', label: 'Qwen 3 Next 80B (Free)' },
+  { value: 'liquid/lfm-2.5-1.2b-thinking:free', label: 'Liquid LFM 2.5 1.2B (Free)' },
+  { value: 'openrouter/free', label: 'OpenRouter: Free Router' },
 ];
 
 function formatBytes(bytes: number): string {
@@ -35,6 +47,11 @@ export function SettingsPage() {
   const [apiKey, setApiKey] = useState('');
   const [apiKeyMasked, setApiKeyMasked] = useState(true);
   const [apiKeySaved, setApiKeySaved] = useState(false);
+
+  // OpenRouter API Key
+  const [openRouterApiKey, setOpenRouterApiKey] = useState('');
+  const [openRouterApiKeyMasked, setOpenRouterApiKeyMasked] = useState(true);
+  const [openRouterApiKeySaved, setOpenRouterApiKeySaved] = useState(false);
 
   // Model
   const [model, setModel] = useState(orch.getModel());
@@ -69,6 +86,17 @@ export function SettingsPage() {
         }
       }
 
+      // OpenRouter API key
+      const encORKey = await getConfig(CONFIG_KEYS.OPENROUTER_API_KEY);
+      if (encORKey) {
+        try {
+          const dec = await decryptValue(encORKey);
+          setOpenRouterApiKey(dec);
+        } catch {
+          setOpenRouterApiKey('');
+        }
+      }
+
       // Telegram
       const token = await getConfig(CONFIG_KEYS.TELEGRAM_BOT_TOKEN);
       if (token) setTelegramToken(token);
@@ -96,6 +124,12 @@ export function SettingsPage() {
     await orch.setApiKey(apiKey.trim());
     setApiKeySaved(true);
     setTimeout(() => setApiKeySaved(false), 2000);
+  }
+
+  async function handleSaveOpenRouterApiKey() {
+    await orch.setOpenRouterApiKey(openRouterApiKey.trim());
+    setOpenRouterApiKeySaved(true);
+    setTimeout(() => setOpenRouterApiKeySaved(false), 2000);
   }
 
   async function handleModelChange(value: string) {
@@ -147,39 +181,79 @@ export function SettingsPage() {
         </div>
       </div>
 
-      {/* ---- API Key ---- */}
+      {/* ---- API Keys ---- */}
       <div className="card card-bordered bg-base-200">
         <div className="card-body p-4 sm:p-6 gap-3">
-          <h3 className="card-title text-base gap-2"><KeyRound className="w-4 h-4" /> Anthropic API Key</h3>
-          <div className="flex gap-2">
-            <input
-              type={apiKeyMasked ? 'password' : 'text'}
-              className="input input-bordered input-sm w-full flex-1 font-mono"
-              placeholder="sk-ant-..."
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-            />
-            <button
-              className="btn btn-ghost btn-sm"
-              onClick={() => setApiKeyMasked(!apiKeyMasked)}
-            >
-              {apiKeyMasked ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-            </button>
+          <h3 className="card-title text-base gap-2"><KeyRound className="w-4 h-4" /> API Keys</h3>
+
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm opacity-70 mb-1 block">Anthropic API Key</label>
+              <div className="flex gap-2">
+                <input
+                  type={apiKeyMasked ? 'password' : 'text'}
+                  className="input input-bordered input-sm w-full flex-1 font-mono"
+                  placeholder="sk-ant-..."
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                />
+                <button
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => setApiKeyMasked(!apiKeyMasked)}
+                >
+                  {apiKeyMasked ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                </button>
+              </div>
+              <div className="flex items-center gap-2 mt-2">
+                <button
+                  className="btn btn-primary btn-sm"
+                  onClick={handleSaveApiKey}
+                  disabled={!apiKey.trim()}
+                >
+                  Save Anthropic Key
+                </button>
+                {apiKeySaved && (
+                  <span className="text-success text-sm flex items-center gap-1"><Check className="w-4 h-4" /> Saved</span>
+                )}
+              </div>
+            </div>
+
+            <div className="divider my-0"></div>
+
+            <div>
+              <label className="text-sm opacity-70 mb-1 block">OpenRouter API Key</label>
+              <div className="flex gap-2">
+                <input
+                  type={openRouterApiKeyMasked ? 'password' : 'text'}
+                  className="input input-bordered input-sm w-full flex-1 font-mono"
+                  placeholder="sk-or-..."
+                  value={openRouterApiKey}
+                  onChange={(e) => setOpenRouterApiKey(e.target.value)}
+                />
+                <button
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => setOpenRouterApiKeyMasked(!openRouterApiKeyMasked)}
+                >
+                  {openRouterApiKeyMasked ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                </button>
+              </div>
+              <div className="flex items-center gap-2 mt-2">
+                <button
+                  className="btn btn-primary btn-sm"
+                  onClick={handleSaveOpenRouterApiKey}
+                  disabled={!openRouterApiKey.trim()}
+                >
+                  Save OpenRouter Key
+                </button>
+                {openRouterApiKeySaved && (
+                  <span className="text-success text-sm flex items-center gap-1"><Check className="w-4 h-4" /> Saved</span>
+                )}
+              </div>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              className="btn btn-primary btn-sm"
-              onClick={handleSaveApiKey}
-              disabled={!apiKey.trim()}
-            >
-              Save
-            </button>
-            {apiKeySaved && (
-              <span className="text-success text-sm flex items-center gap-1"><Check className="w-4 h-4" /> Saved</span>
-            )}
-          </div>
-          <p className="text-xs opacity-50">
-            Your API key is encrypted and stored locally. It never leaves your browser.
+
+          <p className="text-xs opacity-50 mt-2">
+            Your API keys are encrypted and stored locally. They never leave your browser.
           </p>
         </div>
       </div>
