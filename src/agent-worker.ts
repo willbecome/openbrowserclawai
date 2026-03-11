@@ -207,7 +207,15 @@ async function handleOpenAICompatibleInvoke(payload: InvokePayload): Promise<voi
       }),
     });
 
-    if (!res.ok) throw new Error(`${provider} error ${res.status}: ${await res.text()}`);
+    if (!res.ok) {
+      const errBody = await res.text();
+      let message = errBody;
+      try {
+        const json = JSON.parse(errBody);
+        message = json.error?.message || json.error || errBody;
+      } catch { /* ignore */ }
+      throw new Error(`${provider} error ${res.status}: ${message}`);
+    }
     const result = await res.json();
     const choice = result.choices[0];
     const message = choice.message;
@@ -293,7 +301,15 @@ async function handleGeminiInvoke(payload: InvokePayload): Promise<void> {
       }),
     });
 
-    if (!res.ok) throw new Error(`Gemini error ${res.status}: ${await res.text()}`);
+    if (!res.ok) {
+      const errBody = await res.text();
+      let message = errBody;
+      try {
+        const json = JSON.parse(errBody);
+        message = json.error?.message || json[0]?.error?.message || errBody;
+      } catch { /* ignore */ }
+      throw new Error(`Gemini error ${res.status}: ${message}`);
+    }
     const result = await res.json();
     const candidate = result.candidates[0];
     const message = candidate.content;
@@ -371,7 +387,15 @@ async function handleCompact(payload: CompactPayload): Promise<void> {
           messages: compactMessages,
         }),
       });
-      if (!res.ok) throw new Error(`Anthropic error: ${await res.text()}`);
+      if (!res.ok) {
+        const errBody = await res.text();
+        let message = errBody;
+        try {
+          const json = JSON.parse(errBody);
+          message = json.error?.message || errBody;
+        } catch { /* ignore */ }
+        throw new Error(`Anthropic error: ${message}`);
+      }
       const result = await res.json();
       summary = result.content.filter((b: any) => b.type === 'text').map((b: any) => b.text).join('');
     } else {
@@ -391,7 +415,15 @@ async function handleCompact(payload: CompactPayload): Promise<void> {
           max_tokens: 1024,
         }),
       });
-      if (!res.ok) throw new Error(`${provider} error: ${await res.text()}`);
+      if (!res.ok) {
+        const errBody = await res.text();
+        let message = errBody;
+        try {
+          const json = JSON.parse(errBody);
+          message = json.error?.message || errBody;
+        } catch { /* ignore */ }
+        throw new Error(`${provider} error: ${message}`);
+      }
       const result = await res.json();
       summary = result.choices[0].message.content;
     }

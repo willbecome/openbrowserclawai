@@ -498,7 +498,11 @@ export class Orchestrator {
 
       case 'error': {
         const { groupId, error } = msg.payload;
-        await this.deliverResponse(groupId, `⚠️ Error: ${error}`);
+        let enhancedError = error;
+        if (error.includes('429')) {
+          enhancedError += '\n\n💡 **Mẹo:** Bạn đang bị giới hạn tốc độ (Rate Limit). Hãy thử đổi sang mô hình khác hoặc chờ vài phút trước khi thử lại.';
+        }
+        await this.deliverResponse(groupId, `⚠️ Lỗi: ${enhancedError}`);
         break;
       }
 

@@ -62,4 +62,17 @@ Sau khi chạy lệnh cuối cùng, bạn mở trình duyệt và truy cập đ�
 - **Thực thi lệnh:** AI có khả năng chạy mã JavaScript hoặc lệnh Linux (Bash) để giải quyết các yêu cầu phức tạp.
 
 ---
+
+## ❓ Các lỗi thường gặp và cách xử lý
+
+- **Lỗi 429 (Rate Limit):**
+  - *Nguyên nhân:* Bạn đã vượt quá số lượng câu hỏi cho phép trong một khoảng thời gian (thường gặp khi dùng mô hình Miễn phí).
+  - *Xử lý:* Chờ vài phút rồi thử lại, hoặc chuyển sang một mô hình (Free) khác trong phần Cài đặt.
+- **Lỗi API Key không hợp lệ:**
+  - *Nguyên nhân:* Key nhập sai hoặc đã hết hạn/bị xóa.
+  - *Xử lý:* Kiểm tra lại key tại trang quản lý của nhà cung cấp (ví dụ: OpenRouter) và cập nhật lại trong mục Cài đặt.
+- **Trợ lý không phản hồi:**
+  - *Xử lý:* F5 lại trang web hoặc kiểm tra kết nối internet của bạn.
+
+---
 *Dự án này được phát triển với mục tiêu mang AI đến gần hơn với mọi người dùng Việt Nam một cách dễ dàng và an toàn nhất.* 🦀
