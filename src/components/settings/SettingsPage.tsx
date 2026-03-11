@@ -5,7 +5,7 @@
 import { useEffect, useState } from 'react';
 import {
   Palette, KeyRound, Eye, EyeOff, Bot, MessageSquare,
-  Smartphone, HardDrive, Lock, Check,
+  Smartphone, HardDrive, Lock, Check, RefreshCw,
 } from 'lucide-react';
 import { getConfig, setConfig } from '../../db.js';
 import { CONFIG_KEYS } from '../../config.js';
@@ -204,6 +204,11 @@ export function SettingsPage() {
     setIsPersistent(granted);
   }
 
+  function handleManualUpdateCheck() {
+    // Reload will trigger useGitHubUpdate check
+    window.location.reload();
+  }
+
   const storagePercent = storageQuota > 0 ? (storageUsage / storageQuota) * 100 : 0;
 
   return (
@@ -364,6 +369,22 @@ export function SettingsPage() {
               <span className="text-success text-sm flex items-center gap-1"><Check className="w-4 h-4" /> Đã lưu</span>
             )}
           </div>
+        </div>
+      </div>
+
+      {/* ---- Cập nhật ---- */}
+      <div className="card bg-base-200 shadow-sm border border-base-300">
+        <div className="card-body p-4 sm:p-6 gap-3">
+          <h3 className="card-title text-base gap-2"><RefreshCw className="w-4 h-4 text-primary" /> Hệ thống</h3>
+          <button
+            className="btn btn-outline btn-sm gap-2"
+            onClick={handleManualUpdateCheck}
+          >
+            <RefreshCw className="w-4 h-4" /> Kiểm tra cập nhật
+          </button>
+          <p className="text-xs opacity-60">
+            Kiểm tra các thay đổi mới nhất từ branch chính thức.
+          </p>
         </div>
       </div>
 

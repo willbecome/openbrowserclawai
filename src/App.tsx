@@ -11,12 +11,15 @@ import { ChatPage } from './components/chat/ChatPage.js';
 import { FilesPage } from './components/files/FilesPage.js';
 import { TasksPage } from './components/tasks/TasksPage.js';
 import { SettingsPage } from './components/settings/SettingsPage.js';
+import { useGitHubUpdate } from './hooks/useGitHubUpdate.js';
+import { AlertCircle, RefreshCw } from 'lucide-react';
 
 export function App() {
   const orchRef = useRef<Orchestrator | null>(null);
   const [loading, setLoading] = useState(true);
   const [initError, setInitError] = useState<string | null>(null);
   const ready = useOrchestratorStore((s) => s.ready);
+  const { hasUpdate, updateNow } = useGitHubUpdate();
 
   useEffect(() => {
     let cancelled = false;
@@ -66,6 +69,23 @@ export function App() {
 
   return (
     <BrowserRouter>
+      {/* --- OTA Update Banner --- */}
+      {hasUpdate && (
+        <div className="fixed top-0 left-0 right-0 bg-success text-success-content z-[100] px-4 py-2.5 flex items-center gap-3 shadow-lg animate-in slide-in-from-top duration-500">
+          <AlertCircle className="w-5 h-5 shrink-0" />
+          <div className="flex-1 text-sm font-medium">
+            🎉 Đã có phiên bản mới! Hãy cập nhật để trải nghiệm tính năng mới nhất.
+          </div>
+          <button
+            onClick={updateNow}
+            className="btn btn-sm btn-ghost bg-base-100/20 hover:bg-base-100/40 border-none gap-2"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Cập nhật ngay
+          </button>
+        </div>
+      )}
+
       <Routes>
         <Route element={<Layout />}>
           <Route
