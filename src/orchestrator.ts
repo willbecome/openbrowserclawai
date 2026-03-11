@@ -290,8 +290,8 @@ export class Orchestrator {
   /**
    * Submit a message from the browser chat UI.
    */
-  submitMessage(text: string, groupId?: string): void {
-    this.browserChat.submit(text, groupId);
+  submitMessage(content: string | import('./types.js').ContentBlock[], groupId?: string): void {
+    this.browserChat.submit(content, groupId);
   }
 
   /**
@@ -381,7 +381,10 @@ export class Orchestrator {
 
     // Check trigger
     const isBrowserMain = msg.groupId === DEFAULT_GROUP_ID;
-    const hasTrigger = this.triggerPattern.test(msg.content.trim());
+    const msgText = typeof msg.content === 'string'
+      ? msg.content
+      : msg.content.filter(b => b.type === 'text').map(b => b.text).join(' ');
+    const hasTrigger = this.triggerPattern.test(msgText.trim());
 
     // Browser main group always triggers; other groups need the trigger pattern
     if (isBrowserMain || hasTrigger) {
@@ -427,14 +430,15 @@ export class Orchestrator {
     }
   }
 
-  private async invokeAgent(groupId: string, triggerContent: string): Promise<void> {
+  private async invokeAgent(groupId: string, triggerContent: string | import('./types.js').ContentBlock[]): Promise<void> {
     this.setState('thinking');
     this.router.setTyping(groupId, true);
     this.events.emit('typing', { groupId, typing: true });
 
     // If this is a scheduled task, save the prompt as a user message so
     // it appears in conversation context and in the chat UI.
-    if (triggerContent.startsWith('[SCHEDULED TASK]')) {
+    const triggerText = typeof triggerContent === 'string' ? triggerContent : '';
+    if (triggerText.startsWith('[SCHEDULED TASK]')) {
       this.pendingScheduledTasks.add(groupId);
       const stored: StoredMessage = {
         id: ulid(),
@@ -557,13 +561,13 @@ export class Orchestrator {
     this.setState('idle');
   }
 
-  private async deliverResponse(groupId: string, text: string): Promise<void> {
+  private async deliverResponse(groupId: string, content: string | import('./types.js').ContentBlock[]): Promise<void> {
     // Save to DB
     const stored: StoredMessage = {
       id: ulid(),
       groupId,
       sender: this.assistantName,
-      content: text,
+      content,
       timestamp: Date.now(),
       channel: groupId.startsWith('tg:') ? 'telegram' : 'browser',
       isFromMe: true,
@@ -572,7 +576,7 @@ export class Orchestrator {
     await saveMessage(stored);
 
     // Route to channel
-    await this.router.send(groupId, text);
+    await this.router.send(groupId, content as any);
 
     // Play notification chime for scheduled task responses
     if (this.pendingScheduledTasks.has(groupId)) {

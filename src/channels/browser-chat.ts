@@ -8,7 +8,7 @@ import { ulid } from '../ulid.js';
 
 type MessageCallback = (msg: InboundMessage) => void;
 type TypingCallback = (groupId: string, typing: boolean) => void;
-type MessageDisplayCallback = (groupId: string, text: string, isFromMe: boolean) => void;
+type MessageDisplayCallback = (groupId: string, content: string | import('../types.js').ContentBlock[], isFromMe: boolean) => void;
 
 /**
  * In-browser chat channel. Bridges the UI chat component with the orchestrator.
@@ -32,13 +32,13 @@ export class BrowserChatChannel implements Channel {
   /**
    * Called by the UI when the user submits a message.
    */
-  submit(text: string, groupId?: string): void {
+  submit(content: string | import('../types.js').ContentBlock[], groupId?: string): void {
     const gid = groupId || this.activeGroupId;
     const msg: InboundMessage = {
       id: ulid(),
       groupId: gid,
-      sender: 'You',
-      content: text,
+      sender: 'Bạn',
+      content: content,
       timestamp: Date.now(),
       channel: 'browser',
     };
@@ -48,8 +48,8 @@ export class BrowserChatChannel implements Channel {
   /**
    * Send a response to the browser chat UI for display.
    */
-  async send(groupId: string, text: string): Promise<void> {
-    this.displayCallback?.(groupId, text, true);
+  async send(groupId: string, content: string | import('../types.js').ContentBlock[]): Promise<void> {
+    this.displayCallback?.(groupId, content, true);
   }
 
   /**
