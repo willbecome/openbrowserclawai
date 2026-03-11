@@ -26,11 +26,14 @@ const PROVIDERS = [
 
 const MODELS_BY_PROVIDER: Record<string, { value: string; label: string }[]> = {
   openrouter: [
-    { value: 'google/gemini-2.0-flash-exp:free', label: 'Gemini 2.0 Flash (Free)' },
-    { value: 'google/gemini-2.0-pro-exp-02-05:free', label: 'Gemini 2.0 Pro (Free)' },
-    { value: 'anthropic/claude-3.7-sonnet', label: 'Claude 3.7 Sonnet' },
-    { value: 'openai/gpt-4o', label: 'GPT-4o' },
+    { value: 'openrouter/free', label: 'Tự động chọn (Miễn phí)' },
+    { value: 'google/gemini-2.0-pro-exp-02-05:free', label: 'Gemini 2.0 Pro (Miễn phí)' },
+    { value: 'meta-llama/llama-3.3-70b-instruct:free', label: 'Llama 3.3 70B (Miễn phí)' },
+    { value: 'qwen/qwen3-coder:free', label: 'Qwen3 Coder (Miễn phí)' },
+    { value: 'openai/gpt-oss-120b:free', label: 'GPT OSS 120B (Miễn phí)' },
+    { value: 'google/gemma-3-27b-it:free', label: 'Gemma 3 27B (Miễn phí)' },
     { value: 'deepseek/deepseek-r1', label: 'DeepSeek R1' },
+    { value: 'anthropic/claude-3.7-sonnet', label: 'Claude 3.7 Sonnet' },
   ],
   anthropic: [
     { value: 'claude-3-7-sonnet-20250219', label: 'Claude 3.7 Sonnet' },
