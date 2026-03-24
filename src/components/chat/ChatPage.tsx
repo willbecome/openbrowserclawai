@@ -32,18 +32,18 @@ const LineGraphIcon = ({ className }: { className?: string }) => (
 const PROMPT_STARTERS = [
     {
         icon: Globe,
-        title: 'Latest news',
-        prompt: 'Get me the top trending posts from HackerNews.',
+        title: 'Tin tức mới nhất',
+        prompt: 'Lấy cho tôi các bài đăng thịnh hành hàng đầu từ HackerNews.',
     },
     {
         icon: LineGraphIcon,
-        title: 'Generate a report',
-        prompt: 'Show me a graph with the Ethereum price over the last 6 months.',
+        title: 'Tạo báo cáo',
+        prompt: 'Cho tôi xem biểu đồ giá Ethereum trong 6 tháng qua.',
     },
     {
         icon: MapPin,
-        title: 'Map viewer',
-        prompt: 'Generate an interactive map viewer with the top locations to visit in Seattle.',
+        title: 'Xem bản đồ',
+        prompt: 'Tạo một trình xem bản đồ tương tác với các địa điểm hàng đầu nên ghé thăm ở Seattle.',
     },
 ];
 
@@ -78,9 +78,9 @@ export function ChatPage() {
           <div className="hero min-h-full">
             <div className="hero-content text-center">
               <div className="max-w-md">
-                <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-30" />
-                <h2 className="text-2xl font-bold">Start a conversation</h2>
-                <p className="mt-2 opacity-60 mb-6">Try one of these to get started</p>
+                <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-30 text-primary" />
+                <h2 className="text-2xl font-bold">Bắt đầu cuộc trò chuyện</h2>
+                <p className="mt-2 opacity-60 mb-6 text-sm">Thử một trong những gợi ý dưới đây hoặc gửi ảnh/tài liệu để phân tích</p>
                 <div className="grid gap-3">
                   {PROMPT_STARTERS.map(({ icon: Icon, title, prompt }) => (
                     <button

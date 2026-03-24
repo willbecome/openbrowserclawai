@@ -19,6 +19,7 @@ import type {
   Task,
   ConversationMessage,
   ThinkingLogEntry,
+  AIProvider,
 } from './types.js';
 import {
   ASSISTANT_NAME,
@@ -100,7 +101,16 @@ export class Orchestrator {
   private state: OrchestratorState = 'idle';
   private triggerPattern!: RegExp;
   private assistantName: string = ASSISTANT_NAME;
-  private apiKey: string = '';
+  private provider: AIProvider = 'openrouter';
+  private apiKeys: Record<AIProvider, string> = {
+    anthropic: '',
+    openai: '',
+    gemini: '',
+    openrouter: '',
+    deepseek: '',
+    grok: '',
+    perplexity: '',
+  };
   private model: string = DEFAULT_MODEL;
   private maxTokens: number = DEFAULT_MAX_TOKENS;
   private messageQueue: InboundMessage[] = [];
@@ -117,16 +127,30 @@ export class Orchestrator {
     // Load config
     this.assistantName = (await getConfig(CONFIG_KEYS.ASSISTANT_NAME)) || ASSISTANT_NAME;
     this.triggerPattern = buildTriggerPattern(this.assistantName);
-    const storedKey = await getConfig(CONFIG_KEYS.ANTHROPIC_API_KEY);
-    if (storedKey) {
-      try {
-        this.apiKey = await decryptValue(storedKey);
-      } catch {
-        // Stored as plaintext from before encryption — clear it
-        this.apiKey = '';
-        await setConfig(CONFIG_KEYS.ANTHROPIC_API_KEY, '');
+
+    // Load API keys
+    const providerKeys: Record<AIProvider, string> = {
+      anthropic: CONFIG_KEYS.ANTHROPIC_API_KEY,
+      openai: CONFIG_KEYS.OPENAI_API_KEY,
+      gemini: CONFIG_KEYS.GEMINI_API_KEY,
+      openrouter: CONFIG_KEYS.OPENROUTER_API_KEY,
+      deepseek: CONFIG_KEYS.DEEPSEEK_API_KEY,
+      grok: CONFIG_KEYS.GROK_API_KEY,
+      perplexity: CONFIG_KEYS.PERPLEXITY_API_KEY,
+    };
+
+    for (const [p, key] of Object.entries(providerKeys)) {
+      const stored = await getConfig(key);
+      if (stored) {
+        try {
+          this.apiKeys[p as AIProvider] = await decryptValue(stored);
+        } catch {
+          await setConfig(key, '');
+        }
       }
     }
+
+    this.provider = (await getConfig(CONFIG_KEYS.PROVIDER) as AIProvider) || 'openrouter';
     this.model = (await getConfig(CONFIG_KEYS.MODEL)) || DEFAULT_MODEL;
     this.maxTokens = parseInt(
       (await getConfig(CONFIG_KEYS.MAX_TOKENS)) || String(DEFAULT_MAX_TOKENS),
@@ -183,19 +207,42 @@ export class Orchestrator {
   }
 
   /**
-   * Check if the API key is configured.
+   * Check if the API key for current provider is configured.
    */
   isConfigured(): boolean {
-    return this.apiKey.length > 0;
+    return this.apiKeys[this.provider].length > 0;
   }
 
   /**
-   * Update the API key.
+   * Update the API key for a provider.
    */
-  async setApiKey(key: string): Promise<void> {
-    this.apiKey = key;
+  async setApiKey(provider: AIProvider, key: string): Promise<void> {
+    this.apiKeys[provider] = key;
+    const configKey = CONFIG_KEYS[`${provider.toUpperCase()}_API_KEY` as keyof typeof CONFIG_KEYS];
     const encrypted = await encryptValue(key);
-    await setConfig(CONFIG_KEYS.ANTHROPIC_API_KEY, encrypted);
+    await setConfig(configKey, encrypted);
+  }
+
+  /**
+   * Get API key for a provider.
+   */
+  getApiKey(provider: AIProvider): string {
+    return this.apiKeys[provider];
+  }
+
+  /**
+   * Get active provider.
+   */
+  getProvider(): AIProvider {
+    return this.provider;
+  }
+
+  /**
+   * Set active provider.
+   */
+  async setProvider(provider: AIProvider): Promise<void> {
+    this.provider = provider;
+    await setConfig(CONFIG_KEYS.PROVIDER, provider);
   }
 
   /**
@@ -243,8 +290,8 @@ export class Orchestrator {
   /**
    * Submit a message from the browser chat UI.
    */
-  submitMessage(text: string, groupId?: string): void {
-    this.browserChat.submit(text, groupId);
+  submitMessage(content: string | import('./types.js').ContentBlock[], groupId?: string): void {
+    this.browserChat.submit(content, groupId);
   }
 
   /**
@@ -261,10 +308,11 @@ export class Orchestrator {
    * Asks Claude to produce a summary, then replaces the history with it.
    */
   async compactContext(groupId: string = DEFAULT_GROUP_ID): Promise<void> {
-    if (!this.apiKey) {
+    const apiKey = this.apiKeys[this.provider];
+    if (!apiKey) {
       this.events.emit('error', {
         groupId,
-        error: 'API key not configured. Cannot compact context.',
+        error: `API key for ${this.provider} not configured. Cannot compact context.`,
       });
       return;
     }
@@ -297,7 +345,8 @@ export class Orchestrator {
         groupId,
         messages,
         systemPrompt,
-        apiKey: this.apiKey,
+        apiKey,
+        provider: this.provider,
         model: this.model,
         maxTokens: this.maxTokens,
       },
@@ -332,7 +381,10 @@ export class Orchestrator {
 
     // Check trigger
     const isBrowserMain = msg.groupId === DEFAULT_GROUP_ID;
-    const hasTrigger = this.triggerPattern.test(msg.content.trim());
+    const msgText = typeof msg.content === 'string'
+      ? msg.content
+      : msg.content.filter(b => b.type === 'text').map(b => b.text).join(' ');
+    const hasTrigger = this.triggerPattern.test(msgText.trim());
 
     // Browser main group always triggers; other groups need the trigger pattern
     if (isBrowserMain || hasTrigger) {
@@ -350,12 +402,14 @@ export class Orchestrator {
   private async processQueue(): Promise<void> {
     if (this.processing) return;
     if (this.messageQueue.length === 0) return;
-    if (!this.apiKey) {
+
+    const apiKey = this.apiKeys[this.provider];
+    if (!apiKey) {
       // Can't process without API key
       const msg = this.messageQueue.shift()!;
       this.events.emit('error', {
         groupId: msg.groupId,
-        error: 'API key not configured. Go to Settings to add your Anthropic API key.',
+        error: `API key for ${this.provider} not configured. Go to Settings to add your API key.`,
       });
       return;
     }
@@ -376,14 +430,15 @@ export class Orchestrator {
     }
   }
 
-  private async invokeAgent(groupId: string, triggerContent: string): Promise<void> {
+  private async invokeAgent(groupId: string, triggerContent: string | import('./types.js').ContentBlock[]): Promise<void> {
     this.setState('thinking');
     this.router.setTyping(groupId, true);
     this.events.emit('typing', { groupId, typing: true });
 
     // If this is a scheduled task, save the prompt as a user message so
     // it appears in conversation context and in the chat UI.
-    if (triggerContent.startsWith('[SCHEDULED TASK]')) {
+    const triggerText = typeof triggerContent === 'string' ? triggerContent : '';
+    if (triggerText.startsWith('[SCHEDULED TASK]')) {
       this.pendingScheduledTasks.add(groupId);
       const stored: StoredMessage = {
         id: ulid(),
@@ -419,7 +474,8 @@ export class Orchestrator {
         groupId,
         messages,
         systemPrompt,
-        apiKey: this.apiKey,
+        apiKey: this.apiKeys[this.provider],
+        provider: this.provider,
         model: this.model,
         maxTokens: this.maxTokens,
       },
@@ -446,7 +502,11 @@ export class Orchestrator {
 
       case 'error': {
         const { groupId, error } = msg.payload;
-        await this.deliverResponse(groupId, `⚠️ Error: ${error}`);
+        let enhancedError = error;
+        if (error.includes('429')) {
+          enhancedError += '\n\n💡 **Mẹo:** Bạn đang bị giới hạn tốc độ (Rate Limit). Hãy thử đổi sang mô hình khác hoặc chờ vài phút trước khi thử lại.';
+        }
+        await this.deliverResponse(groupId, `⚠️ Lỗi: ${enhancedError}`);
         break;
       }
 
@@ -501,13 +561,13 @@ export class Orchestrator {
     this.setState('idle');
   }
 
-  private async deliverResponse(groupId: string, text: string): Promise<void> {
+  private async deliverResponse(groupId: string, content: string | import('./types.js').ContentBlock[]): Promise<void> {
     // Save to DB
     const stored: StoredMessage = {
       id: ulid(),
       groupId,
       sender: this.assistantName,
-      content: text,
+      content,
       timestamp: Date.now(),
       channel: groupId.startsWith('tg:') ? 'telegram' : 'browser',
       isFromMe: true,
@@ -516,7 +576,7 @@ export class Orchestrator {
     await saveMessage(stored);
 
     // Route to channel
-    await this.router.send(groupId, text);
+    await this.router.send(groupId, content as any);
 
     // Play notification chime for scheduled task responses
     if (this.pendingScheduledTasks.has(groupId)) {

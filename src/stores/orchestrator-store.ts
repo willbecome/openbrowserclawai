@@ -26,7 +26,7 @@ interface OrchestratorStoreState {
   ready: boolean;
 
   // --- actions ---
-  sendMessage: (text: string) => void;
+  sendMessage: (content: string | import('../types.js').ContentBlock[]) => void;
   newSession: () => Promise<void>;
   compactContext: () => Promise<void>;
   clearError: () => void;
@@ -51,9 +51,9 @@ export const useOrchestratorStore = create<OrchestratorStoreState>((set, get) =>
   activeGroupId: DEFAULT_GROUP_ID,
   ready: false,
 
-  sendMessage: (text) => {
+  sendMessage: (content) => {
     const orch = getOrchestrator();
-    orch.submitMessage(text, get().activeGroupId);
+    orch.submitMessage(content, get().activeGroupId);
   },
 
   newSession: async () => {

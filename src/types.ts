@@ -7,7 +7,7 @@ export interface InboundMessage {
   id: string;
   groupId: string; // "br:main", "tg:-100123456"
   sender: string;
-  content: string;
+  content: string | ContentBlock[];
   timestamp: number; // epoch ms
   channel: ChannelType;
 }
@@ -42,11 +42,12 @@ export interface ConversationMessage {
   content: string | ContentBlock[];
 }
 
-/** Content block for tool use conversations */
+/** Content block for tool use and multi-modal conversations */
 export type ContentBlock =
   | { type: 'text'; text: string }
+  | { type: 'image_url'; image_url: { url: string }; name?: string }
   | { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> }
-  | { type: 'tool_result'; tool_use_id: string; content: string };
+  | { type: 'tool_result'; tool_use_id: string; name: string; content: string };
 
 /** Config entry */
 export interface ConfigEntry {
@@ -61,7 +62,7 @@ export interface Channel {
   readonly type: ChannelType;
   start(): void;
   stop(): void;
-  send(groupId: string, text: string): Promise<void>;
+  send(groupId: string, content: string | ContentBlock[]): Promise<void>;
   setTyping(groupId: string, typing: boolean): void;
   onMessage(callback: (msg: InboundMessage) => void): void;
 }
@@ -72,11 +73,14 @@ export type WorkerInbound =
   | { type: 'cancel'; payload: { groupId: string } }
   | { type: 'compact'; payload: CompactPayload };
 
+export type AIProvider = 'anthropic' | 'openai' | 'gemini' | 'openrouter' | 'deepseek' | 'grok' | 'perplexity';
+
 export interface CompactPayload {
   groupId: string;
   messages: ConversationMessage[];
   systemPrompt: string;
   apiKey: string;
+  provider: AIProvider;
   model: string;
   maxTokens: number;
 }
@@ -86,6 +90,7 @@ export interface InvokePayload {
   messages: ConversationMessage[];
   systemPrompt: string;
   apiKey: string;
+  provider: AIProvider;
   model: string;
   maxTokens: number;
 }

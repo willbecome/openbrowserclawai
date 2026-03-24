@@ -61,22 +61,13 @@ function formatTime(ts: number): string {
 
 export function MessageBubble({ message }: Props) {
   const isAssistant = message.isFromMe;
-  const senderName = isAssistant ? getSenderName(message) : 'You';
+  const senderName = isAssistant ? getSenderName(message) : 'Bạn';
 
-  return (
-    <div className={`chat ${isAssistant ? 'chat-start' : 'chat-end'}`}>
-      <div className="chat-header opacity-60 mb-0.5">
-        {senderName}
-        <time className="ml-2 text-xs">{formatTime(message.timestamp)}</time>
-      </div>
-      <div
-        className={`chat-bubble ${
-          isAssistant ? '' : 'chat-bubble-primary'
-        }`}
-      >
-        {isAssistant ? (
-          <div className="chat-markdown">
-            <ReactMarkdown
+  const renderContent = (content: string | import('../../types.js').ContentBlock[]) => {
+    if (typeof content === 'string') {
+      return isAssistant ? (
+        <div className="chat-markdown">
+          <ReactMarkdown
               remarkPlugins={[remarkGfm]}
               rehypePlugins={[rehypeRaw, [rehypeSanitize, sanitizeSchema]]}
               components={{
@@ -156,16 +147,143 @@ export function MessageBubble({ message }: Props) {
                 },
               }}
             >
-              {message.content}
+              {content}
             </ReactMarkdown>
           </div>
         ) : (
-          <span className="whitespace-pre-wrap">{message.content}</span>
-        )}
+          <span className="whitespace-pre-wrap">{content}</span>
+        );
+    }
+
+    return (
+      <div className="space-y-2">
+        {content.map((block, i) => {
+          if (block.type === 'text') {
+            return isAssistant ? (
+              <div key={i} className="chat-markdown">
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  rehypePlugins={[rehypeRaw, [rehypeSanitize, sanitizeSchema]]}
+                  components={markdownComponents}
+                >
+                  {block.text}
+                </ReactMarkdown>
+              </div>
+            ) : (
+              <p key={i} className="whitespace-pre-wrap">{block.text}</p>
+            );
+          }
+          if (block.type === 'image_url') {
+            return (
+              <div key={i} className="mt-1">
+                <img
+                  src={block.image_url.url}
+                  alt={block.name || 'Đính kèm'}
+                  className="max-w-full rounded-lg shadow-sm border border-base-300 max-h-64 object-contain bg-white"
+                />
+                {block.name && <p className="text-[10px] opacity-50 mt-1">{block.name}</p>}
+              </div>
+            );
+          }
+          return null;
+        })}
+      </div>
+    );
+  };
+
+  return (
+    <div className={`chat ${isAssistant ? 'chat-start' : 'chat-end'}`}>
+      <div className="chat-header opacity-60 mb-0.5">
+        {senderName}
+        <time className="ml-2 text-xs">{formatTime(message.timestamp)}</time>
+      </div>
+      <div
+        className={`chat-bubble ${
+          isAssistant ? '' : 'chat-bubble-primary'
+        }`}
+      >
+        {renderContent(message.content)}
       </div>
     </div>
   );
 }
+
+const markdownComponents: any = {
+  code({ className, children, ...props }: any) {
+    const match = /language-(\w+)/.exec(className || '');
+    const codeStr = String(children).replace(/\n$/, '');
+    if (match) {
+      return <CodeBlock language={match[1]} code={codeStr} />;
+    }
+    // Detect inline file paths and make them clickable
+    if (FILE_PATH_RE.test(codeStr)) {
+      return <FileLink path={codeStr} />;
+    }
+    return (
+      <code className="bg-base-300/40 px-1 py-0.5 rounded text-sm font-mono" {...props}>
+        {children}
+      </code>
+    );
+  },
+  pre({ children }: any) {
+    return <>{children}</>;
+  },
+  blockquote({ children }: any) {
+    return (
+      <blockquote className="border-l-4 border-current/20 pl-3 my-1.5 opacity-80 italic">
+        {children}
+      </blockquote>
+    );
+  },
+  table({ children }: any) {
+    return (
+      <div className="overflow-x-auto my-2">
+        <table className="table table-xs">{children}</table>
+      </div>
+    );
+  },
+  p({ children }: any) {
+    return <p className="my-1 leading-relaxed">{children}</p>;
+  },
+  ul({ children }: any) {
+    return <ul className="my-1 pl-5 list-disc space-y-0.5">{children}</ul>;
+  },
+  ol({ children }: any) {
+    return <ol className="my-1 pl-5 list-decimal space-y-0.5">{children}</ol>;
+  },
+  li({ children }: any) {
+    return <li className="pl-0.5">{children}</li>;
+  },
+  a({ href, children }: any) {
+    return (
+      <a href={href} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:opacity-80">
+        {children}
+      </a>
+    );
+  },
+  h1({ children }: any) {
+    return <h1 className="text-lg font-bold mt-3 mb-1">{children}</h1>;
+  },
+  h2({ children }: any) {
+    return <h2 className="text-base font-bold mt-2.5 mb-1">{children}</h2>;
+  },
+  h3({ children }: any) {
+    return <h3 className="text-sm font-bold mt-2 mb-0.5">{children}</h3>;
+  },
+  hr() {
+    return <hr className="my-2 border-current/20" />;
+  },
+  img({ src, alt }: any) {
+    return (
+      <img
+        src={src}
+        alt={alt || ''}
+        className="max-w-full rounded my-2"
+        loading="lazy"
+      />
+    );
+  },
+};
 
 // Clickable inline file link that opens the global file viewer
 function FileLink({ path }: { path: string }) {
@@ -175,7 +293,7 @@ function FileLink({ path }: { path: string }) {
       type="button"
       onClick={() => openFile(path)}
       className="inline-flex items-center gap-1 bg-base-300/40 px-1.5 py-0.5 rounded text-sm font-mono cursor-pointer hover:bg-base-300/70 transition-colors"
-      title={`Open ${path}`}
+      title={`Mở ${path}`}
     >
       <FileText className="w-3.5 h-3.5 shrink-0" />
       {path}

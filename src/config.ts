@@ -20,10 +20,21 @@ export const CONTEXT_WINDOW_SIZE = 50;
 export const DEFAULT_MAX_TOKENS = 8096;
 
 /** Default model */
-export const DEFAULT_MODEL = 'claude-sonnet-4-6';
+export const DEFAULT_MODEL = 'anthropic/claude-3.7-sonnet';
 
-/** Anthropic API endpoint */
-export const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
+/** Default provider */
+export const DEFAULT_PROVIDER = 'openrouter';
+
+/** API Endpoints */
+export const API_ENDPOINTS = {
+  anthropic: 'https://api.anthropic.com/v1/messages',
+  openai: 'https://api.openai.com/v1/chat/completions',
+  gemini: 'https://generativelanguage.googleapis.com/v1beta',
+  openrouter: 'https://openrouter.ai/api/v1/chat/completions',
+  deepseek: 'https://api.deepseek.com/chat/completions',
+  grok: 'https://api.x.ai/v1/chat/completions',
+  perplexity: 'https://api.perplexity.ai/chat/completions',
+} as const;
 
 /** Anthropic API version header */
 export const ANTHROPIC_API_VERSION = '2023-06-01';
@@ -61,6 +72,13 @@ export const DEFAULT_GROUP_ID = 'br:main';
 /** Config keys */
 export const CONFIG_KEYS = {
   ANTHROPIC_API_KEY: 'anthropic_api_key',
+  OPENAI_API_KEY: 'openai_api_key',
+  GEMINI_API_KEY: 'gemini_api_key',
+  GROK_API_KEY: 'grok_api_key',
+  DEEPSEEK_API_KEY: 'deepseek_api_key',
+  PERPLEXITY_API_KEY: 'perplexity_api_key',
+  OPENROUTER_API_KEY: 'openrouter_api_key',
+  PROVIDER: 'provider',
   TELEGRAM_BOT_TOKEN: 'telegram_bot_token',
   TELEGRAM_CHAT_IDS: 'telegram_chat_ids',
   TRIGGER_PATTERN: 'trigger_pattern',

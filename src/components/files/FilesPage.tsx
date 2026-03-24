@@ -58,7 +58,7 @@ export function FilesPage() {
       if ((err as Error)?.name === 'NotFoundError') {
         setEntries([]);
       } else {
-        setError('Failed to load files');
+        setError('Không thể tải danh sách tệp');
       }
     } finally {
       setLoading(false);
@@ -78,7 +78,7 @@ export function FilesPage() {
       const content = await readGroupFile(groupId, filePath);
       setPreviewContent(content);
     } catch {
-      setPreviewContent('[Unable to read file]');
+      setPreviewContent('[Không thể đọc tệp]');
     }
   }
 
@@ -91,7 +91,7 @@ export function FilesPage() {
       setPreviewContent(null);
       loadEntries();
     } catch {
-      setError('Failed to delete file');
+      setError('Xóa tệp thất bại');
     }
   }
 
@@ -120,7 +120,7 @@ export function FilesPage() {
                 className="link link-hover flex items-center gap-1"
                 onClick={() => setPath([])}
               >
-                <Home className="w-4 h-4" /> workspace
+                <Home className="w-4 h-4 text-primary" /> không gian làm việc
               </button>
             </li>
             {path.map((segment, i) => (
@@ -143,7 +143,7 @@ export function FilesPage() {
         <div className="flex-1 overflow-y-auto p-2">
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <span className="loading loading-spinner loading-md" />
+              <span className="loading loading-spinner loading-md text-primary" />
             </div>
           ) : error ? (
             <div role="alert" className="alert alert-error m-4">{error}</div>
@@ -151,9 +151,9 @@ export function FilesPage() {
             <div className="hero py-12">
               <div className="hero-content text-center">
                 <div>
-                  <FolderOpen className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                  <p className="font-medium">No files yet</p>
-                  <p className="text-sm opacity-60 mt-1">Files created by the assistant will appear here</p>
+                  <FolderOpen className="w-12 h-12 mx-auto mb-4 opacity-20 text-primary" />
+                  <p className="text-lg font-medium">Chưa có tệp tin nào</p>
+                  <p className="text-sm opacity-60 mt-1">Các tệp tin được tạo bởi trợ lý sẽ xuất hiện ở đây</p>
                 </div>
               </div>
             </div>
@@ -193,28 +193,28 @@ export function FilesPage() {
           <div className="hidden md:flex flex-col w-1/2 border-l border-base-300 bg-base-200">
             <div className="flex items-center justify-between px-4 py-2 border-b border-base-300">
               <span className="font-medium text-sm truncate flex items-center gap-1.5">
-                {(() => { const Icon = getFileIcon(previewFile, false); return <Icon className="w-4 h-4" />; })()}
+                {(() => { const Icon = getFileIcon(previewFile, false); return <Icon className="w-4 h-4 text-primary" />; })()}
                 {previewFile}
               </span>
               <div className="flex gap-1">
                 <button
                   className="btn btn-ghost btn-xs"
                   onClick={() => handleOpenViewer(previewFile, previewContent)}
-                  title="Open in viewer"
+                  title="Xem toàn màn hình"
                 >
                   <Search className="w-4 h-4" />
                 </button>
                 <button
                   className="btn btn-ghost btn-xs"
                   onClick={() => handleDownload(previewFile, previewContent)}
-                  title="Download"
+                  title="Tải về"
                 >
                   <Download className="w-4 h-4" />
                 </button>
                 <button
                   className="btn btn-ghost btn-xs text-error"
                   onClick={() => setDeleteConfirm(previewFile)}
-                  title="Delete"
+                  title="Xóa"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
@@ -243,7 +243,7 @@ export function FilesPage() {
         <div className="md:hidden fixed inset-0 z-50 bg-base-100 flex flex-col">
           <div className="flex items-center justify-between px-4 py-3 border-b border-base-300">
             <span className="font-medium truncate flex items-center gap-1.5">
-              {(() => { const Icon = getFileIcon(previewFile, false); return <Icon className="w-4 h-4" />; })()}
+              {(() => { const Icon = getFileIcon(previewFile, false); return <Icon className="w-4 h-4 text-primary" />; })()}
               {previewFile}
             </span>
             <div className="flex gap-1">
@@ -296,25 +296,25 @@ export function FilesPage() {
       {/* Delete confirmation */}
       {deleteConfirm && (
         <dialog className="modal modal-open">
-          <div className="modal-box max-w-sm">
-            <h3 className="font-bold text-lg">Delete file?</h3>
-            <p className="py-4">
-              Are you sure you want to delete <strong>{deleteConfirm}</strong>? This cannot be undone.
+          <div className="modal-box max-w-sm shadow-xl border border-base-300">
+            <h3 className="font-bold text-lg">Xóa tệp tin?</h3>
+            <p className="py-4 opacity-80">
+              Bạn có chắc chắn muốn xóa <strong>{deleteConfirm}</strong>? Hành động này không thể hoàn tác.
             </p>
             <div className="modal-action">
               <button className="btn btn-ghost" onClick={() => setDeleteConfirm(null)}>
-                Cancel
+                Hủy
               </button>
               <button
                 className="btn btn-error"
                 onClick={() => handleDelete(deleteConfirm)}
               >
-                Delete
+                Xóa ngay
               </button>
             </div>
           </div>
           <form method="dialog" className="modal-backdrop">
-            <button onClick={() => setDeleteConfirm(null)}>close</button>
+            <button onClick={() => setDeleteConfirm(null)}>đóng</button>
           </form>
         </dialog>
       )}

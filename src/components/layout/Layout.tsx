@@ -9,10 +9,10 @@ import { FileViewerModal } from '../files/FileViewerModal.js';
 import { useFileViewerStore } from '../../stores/file-viewer-store.js';
 
 const navItems = [
-  { to: '/chat', label: 'Chat', icon: MessageSquare },
-  { to: '/files', label: 'Files', icon: FolderOpen },
-  { to: '/tasks', label: 'Tasks', icon: Clock },
-  { to: '/settings', label: 'Settings', icon: Settings },
+  { to: '/chat', label: 'Trò chuyện', icon: MessageSquare },
+  { to: '/files', label: 'Tệp tin', icon: FolderOpen },
+  { to: '/tasks', label: 'Nhiệm vụ', icon: Clock },
+  { to: '/settings', label: 'Cài đặt', icon: Settings },
 ] as const;
 
 export function Layout() {

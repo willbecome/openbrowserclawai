@@ -13,8 +13,8 @@ import { ulid } from '../../ulid.js';
 // Cron helpers
 // ---------------------------------------------------------------------------
 
-const DAYS_OF_WEEK = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-const DAYS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const DAYS_OF_WEEK = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
+const DAYS_SHORT = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
 
 type ScheduleFrequency = 'every-minute' | 'every-5-min' | 'every-15-min' | 'every-30-min' | 'hourly' | 'daily' | 'weekdays' | 'weekly' | 'monthly' | 'custom';
 
@@ -25,16 +25,16 @@ interface SchedulePreset {
 }
 
 const PRESETS: SchedulePreset[] = [
-  { label: 'Every minute', value: 'every-minute', description: 'Runs every minute' },
-  { label: 'Every 5 minutes', value: 'every-5-min', description: 'Runs every 5 minutes' },
-  { label: 'Every 15 minutes', value: 'every-15-min', description: 'Runs every 15 minutes' },
-  { label: 'Every 30 minutes', value: 'every-30-min', description: 'Runs every 30 minutes' },
-  { label: 'Every hour', value: 'hourly', description: 'Runs at the start of every hour' },
-  { label: 'Every day', value: 'daily', description: 'Runs once every day' },
-  { label: 'Weekdays only', value: 'weekdays', description: 'Mon–Fri' },
-  { label: 'Every week', value: 'weekly', description: 'Runs once a week' },
-  { label: 'Every month', value: 'monthly', description: 'Runs once a month' },
-  { label: 'Custom (cron)', value: 'custom', description: 'Enter a cron expression' },
+  { label: 'Mỗi phút', value: 'every-minute', description: 'Chạy mỗi phút' },
+  { label: 'Mỗi 5 phút', value: 'every-5-min', description: 'Chạy mỗi 5 phút' },
+  { label: 'Mỗi 15 phút', value: 'every-15-min', description: 'Chạy mỗi 15 phút' },
+  { label: 'Mỗi 30 phút', value: 'every-30-min', description: 'Chạy mỗi 30 phút' },
+  { label: 'Mỗi giờ', value: 'hourly', description: 'Chạy vào đầu mỗi giờ' },
+  { label: 'Mỗi ngày', value: 'daily', description: 'Chạy một lần mỗi ngày' },
+  { label: 'Chỉ ngày trong tuần', value: 'weekdays', description: 'Thứ 2 – Thứ 6' },
+  { label: 'Mỗi tuần', value: 'weekly', description: 'Chạy một lần mỗi tuần' },
+  { label: 'Mỗi tháng', value: 'monthly', description: 'Chạy một lần mỗi tháng' },
+  { label: 'Tùy chỉnh (cron)', value: 'custom', description: 'Nhập biểu thức cron' },
 ];
 
 function buildCron(freq: ScheduleFrequency, hour: number, minute: number, dayOfWeek: number, dayOfMonth: number): string {
@@ -57,32 +57,32 @@ function cronToHuman(cron: string): string {
   if (parts.length !== 5) return cron;
   const [min, hour, dom, , dow] = parts;
 
-  if (cron === '* * * * *') return 'Every minute';
+  if (cron === '* * * * *') return 'Mỗi phút';
   if (min.startsWith('*/') && hour === '*' && dom === '*' && dow === '*') {
-    return `Every ${min.slice(2)} minutes`;
+    return `Mỗi ${min.slice(2)} phút`;
   }
   if (hour === '*' && dom === '*' && dow === '*' && !min.includes('*') && !min.includes('/')) {
     const m = parseInt(min, 10);
-    return m === 0 ? 'Every hour' : `Every hour at :${String(m).padStart(2, '0')}`;
+    return m === 0 ? 'Mỗi giờ' : `Mỗi giờ tại phút :${String(m).padStart(2, '0')}`;
   }
   if (!hour.includes('*') && !min.includes('*') && !hour.includes('/') && !min.includes('/')) {
     const h = parseInt(hour, 10);
     const m = parseInt(min, 10);
     const ts = formatTime12(h, m);
-    if (dom === '*' && dow === '*') return `Every day at ${ts}`;
-    if (dom === '*' && dow === '1-5') return `Weekdays at ${ts}`;
+    if (dom === '*' && dow === '*') return `Mỗi ngày lúc ${ts}`;
+    if (dom === '*' && dow === '1-5') return `Ngày trong tuần lúc ${ts}`;
     if (dom === '*' && dow !== '*') {
       const d = parseInt(dow, 10);
-      if (!isNaN(d) && d >= 0 && d <= 6) return `Every ${DAYS_OF_WEEK[d]} at ${ts}`;
+      if (!isNaN(d) && d >= 0 && d <= 6) return `Mỗi ${DAYS_OF_WEEK[d]} lúc ${ts}`;
       const names = dow.split(',').map((x) => {
         const n = parseInt(x.trim(), 10);
         return !isNaN(n) && n >= 0 && n <= 6 ? DAYS_SHORT[n] : x;
       });
-      return `Every ${names.join(', ')} at ${ts}`;
+      return `Mỗi ${names.join(', ')} lúc ${ts}`;
     }
     if (dow === '*' && dom !== '*') {
       const d = parseInt(dom, 10);
-      if (!isNaN(d)) return `Monthly on the ${ordinal(d)} at ${ts}`;
+      if (!isNaN(d)) return `Ngày ${d} hàng tháng lúc ${ts}`;
     }
   }
   return cron;
@@ -188,29 +188,31 @@ export function TasksPage() {
     <div className="h-full overflow-y-auto p-4 sm:p-6 max-w-3xl mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-bold">Scheduled Tasks</h2>
+        <h2 className="text-2xl font-bold flex items-center gap-2">
+          <Clock className="w-6 h-6 text-primary" /> Nhiệm vụ định kỳ
+        </h2>
         <button
           className="btn btn-primary btn-sm gap-1.5"
           onClick={() => setShowForm(!showForm)}
         >
-          {showForm ? <><X className="w-4 h-4" /> Cancel</> : <><Plus className="w-4 h-4" /> New Task</>}
+          {showForm ? <><X className="w-4 h-4" /> Hủy</> : <><Plus className="w-4 h-4" /> Nhiệm vụ mới</>}
         </button>
       </div>
 
       {/* Create form */}
       {showForm && (
-        <div className="card card-bordered bg-base-200 mb-6">
+        <div className="card bg-base-200 shadow-sm border border-base-300 mb-6">
           <div className="card-body p-4 sm:p-6 gap-4">
-            <h3 className="card-title text-base">Create Scheduled Task</h3>
+            <h3 className="card-title text-base">Tạo nhiệm vụ định kỳ</h3>
 
             {/* Prompt */}
             <div className="form-control">
               <label className="label">
-                <span className="label-text">Prompt</span>
+                <span className="label-text">Yêu cầu</span>
               </label>
               <textarea
                 className="textarea textarea-bordered h-24"
-                placeholder="What should the assistant do on this schedule?"
+                placeholder="Trợ lý nên làm gì theo lịch trình này?"
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
               />
@@ -219,7 +221,7 @@ export function TasksPage() {
             {/* Frequency */}
             <div className="form-control">
               <label className="label">
-                <span className="label-text">Frequency</span>
+                <span className="label-text">Tần suất</span>
               </label>
               <select
                 className="select select-bordered"
@@ -239,7 +241,7 @@ export function TasksPage() {
               <div className="flex gap-3">
                 <div className="form-control flex-1">
                   <label className="label">
-                    <span className="label-text">Hour</span>
+                    <span className="label-text">Giờ</span>
                   </label>
                   <select
                     className="select select-bordered select-sm"
@@ -255,7 +257,7 @@ export function TasksPage() {
                 </div>
                 <div className="form-control flex-1">
                   <label className="label">
-                    <span className="label-text">Minute</span>
+                    <span className="label-text">Phút</span>
                   </label>
                   <select
                     className="select select-bordered select-sm"
@@ -276,7 +278,7 @@ export function TasksPage() {
             {needsMinutePicker(frequency) && (
               <div className="form-control">
                 <label className="label">
-                  <span className="label-text">At minute</span>
+                  <span className="label-text">Vào phút</span>
                 </label>
                 <select
                   className="select select-bordered select-sm"
@@ -296,7 +298,7 @@ export function TasksPage() {
             {needsDayOfWeek(frequency) && (
               <div className="form-control">
                 <label className="label">
-                  <span className="label-text">Day of week</span>
+                  <span className="label-text">Ngày trong tuần</span>
                 </label>
                 <select
                   className="select select-bordered select-sm"
@@ -314,7 +316,7 @@ export function TasksPage() {
             {needsDayOfMonth(frequency) && (
               <div className="form-control">
                 <label className="label">
-                  <span className="label-text">Day of month</span>
+                  <span className="label-text">Ngày trong tháng</span>
                 </label>
                 <select
                   className="select select-bordered select-sm"
@@ -334,7 +336,7 @@ export function TasksPage() {
             {frequency === 'custom' && (
               <div className="form-control">
                 <label className="label">
-                  <span className="label-text">Cron expression</span>
+                  <span className="label-text">Biểu thức Cron</span>
                 </label>
                 <input
                   type="text"
@@ -345,15 +347,15 @@ export function TasksPage() {
                 />
                 <label className="label">
                   <span className="label-text-alt opacity-60">
-                    Format: minute hour day-of-month month day-of-week
+                    Định dạng: phút giờ ngày-trong-tháng tháng ngày-trong-tuần
                   </span>
                 </label>
               </div>
             )}
 
             {/* Preview */}
-            <div className="bg-base-200 rounded-lg px-3 py-2 text-sm">
-              <span className="opacity-60">Schedule preview: </span>
+            <div className="bg-base-200 rounded-lg px-3 py-2 text-sm border border-base-300">
+              <span className="opacity-60">Xem trước lịch trình: </span>
               <span className="font-medium">{cronToHuman(previewCron)}</span>
               <span className="opacity-50 ml-2 font-mono text-xs">
                 ({previewCron})
@@ -367,7 +369,7 @@ export function TasksPage() {
                 disabled={!prompt.trim()}
                 onClick={handleCreate}
               >
-                Create Task
+                Tạo nhiệm vụ
               </button>
             </div>
           </div>
@@ -377,42 +379,42 @@ export function TasksPage() {
       {/* Task list */}
       {loading ? (
         <div className="flex items-center justify-center py-12">
-          <span className="loading loading-spinner loading-md" />
+          <span className="loading loading-spinner loading-md text-primary" />
         </div>
       ) : tasks.length === 0 ? (
         <div className="hero py-12">
           <div className="hero-content text-center">
             <div>
-              <Clock className="w-8 h-8 mx-auto mb-2 opacity-30" />
-              <p>No scheduled tasks</p>
-              <p className="text-xs opacity-60 mt-1">Create a task to run on a schedule</p>
+              <Clock className="w-12 h-12 mx-auto mb-4 opacity-20 text-primary" />
+              <p className="text-lg font-medium">Chưa có nhiệm vụ nào</p>
+              <p className="text-sm opacity-60 mt-1">Tạo một nhiệm vụ để chạy tự động theo lịch</p>
             </div>
           </div>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-4">
           {tasks.map((task) => (
             <div
               key={task.id}
-              className={`card card-bordered bg-base-200 ${!task.enabled ? 'opacity-50' : ''}`}
+              className={`card bg-base-200 shadow-sm border border-base-300 ${!task.enabled ? 'opacity-50' : ''}`}
             >
               <div className="card-body p-4 sm:p-6 gap-2">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <p className="font-medium line-clamp-2">{task.prompt}</p>
                     <p className="text-sm opacity-70 mt-1 flex items-center gap-1">
-                      <Calendar className="w-3.5 h-3.5 inline" /> {cronToHuman(task.schedule)}
+                      <Calendar className="w-3.5 h-3.5 inline text-primary" /> {cronToHuman(task.schedule)}
                       <span className="opacity-50 ml-2 font-mono text-xs">
                         ({task.schedule})
                       </span>
                     </p>
                     {task.lastRun && (
-                      <p className="text-xs opacity-50 mt-0.5">
-                        Last run: {new Date(task.lastRun).toLocaleString()}
+                      <p className="text-xs opacity-50 mt-1">
+                        Chạy lần cuối: {new Date(task.lastRun).toLocaleString()}
                       </p>
                     )}
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex items-center gap-3 shrink-0">
                     <input
                       type="checkbox"
                       className="toggle toggle-primary toggle-sm"
@@ -420,10 +422,10 @@ export function TasksPage() {
                       onChange={() => handleToggle(task)}
                     />
                     <button
-                      className="btn btn-ghost btn-xs text-error"
+                      className="btn btn-ghost btn-xs text-error p-0"
                       onClick={() => setDeleteConfirm(task.id)}
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Trash2 className="w-5 h-5" />
                     </button>
                   </div>
                 </div>
@@ -436,25 +438,25 @@ export function TasksPage() {
       {/* Delete confirmation */}
       {deleteConfirm && (
         <dialog className="modal modal-open">
-          <div className="modal-box max-w-sm">
-            <h3 className="font-bold text-lg">Delete task?</h3>
-            <p className="py-4">
-              This scheduled task will be permanently removed.
+          <div className="modal-box max-w-sm shadow-xl border border-base-300">
+            <h3 className="font-bold text-lg">Xóa nhiệm vụ?</h3>
+            <p className="py-4 opacity-70">
+              Nhiệm vụ định kỳ này sẽ bị xóa vĩnh viễn khỏi trình duyệt.
             </p>
             <div className="modal-action">
               <button className="btn btn-ghost" onClick={() => setDeleteConfirm(null)}>
-                Cancel
+                Hủy
               </button>
               <button
                 className="btn btn-error"
                 onClick={() => handleDelete(deleteConfirm)}
               >
-                Delete
+                Xóa ngay
               </button>
             </div>
           </div>
           <form method="dialog" className="modal-backdrop">
-            <button onClick={() => setDeleteConfirm(null)}>close</button>
+            <button onClick={() => setDeleteConfirm(null)}>đóng</button>
           </form>
         </dialog>
       )}
